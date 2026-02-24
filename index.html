@@ -1788,7 +1788,7 @@ async function doPayment() {
   const { error } = await sb.from('bookings').insert({
     user_id: currentUser.id,
     charger_id: typeof selectedCharger.id === 'string' && selectedCharger.id.startsWith('ocm_') ? null : selectedCharger.id,
-    slot_id: selectedSlotId || null,
+    slot_id: (selectedSlotId && !String(selectedSlotId).startsWith('ocm_')) ? selectedSlotId : null,
     ref, name, reg,
     booking_time: selectedTime || 'Session',
     duration_minutes: duration,
