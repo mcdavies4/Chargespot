@@ -1789,7 +1789,6 @@ async function doPayment() {
     user_id: currentUser.id,
     charger_id: typeof selectedCharger.id === 'string' && selectedCharger.id.startsWith('ocm_') ? null : selectedCharger.id,
     slot_id: selectedSlotId || null,
-    charger_name: selectedCharger.name.split('—')[0].trim(),
     ref, name, reg,
     booking_time: selectedTime || 'Session',
     duration_minutes: duration,
@@ -1838,7 +1837,7 @@ function renderBookings() {
   el.innerHTML = userBookings.map(b => `
     <div class="bk-card fade-up">
       <div class="bk-header">
-        <div class="bk-name">${b.chargers?.name || b.charger_name || 'Charger'}</div>
+        <div class="bk-name">${b.chargers?.name || 'Charger'}</div>
         <div class="bk-ref ${b.payment_status==='paid'?'paid':''}">${b.ref}</div>
       </div>
       <div class="bk-addr">📍 ${b.chargers?.address || ''}</div>
