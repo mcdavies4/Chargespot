@@ -1051,14 +1051,60 @@ function checkReturnFromStripe() {
   const params = new URLSearchParams(window.location.search);
   const payment = params.get('payment');
   const ref = params.get('ref');
+
+  // Path 1: Stripe redirected back with URL params (ideal)
   if (payment === 'success' && ref) {
     toast('Payment confirmed!', `Booking ${ref} is active`, 'green');
     markPaid(ref, params.get('type'));
+    localStorage.removeItem('cs_pending_ref');
+    localStorage.removeItem('cs_pending_type');
     window.history.replaceState({}, '', APP_URL);
-  } else if (payment === 'cancelled') {
-    toast('Payment cancelled', 'No charge was made', 'amber');
-    window.history.replaceState({}, '', APP_URL);
+    return;
   }
+  if (payment === 'cancelled') {
+    toast('Payment cancelled', 'No charge was made', 'amber');
+    localStorage.removeItem('cs_pending_ref');
+    localStorage.removeItem('cs_pending_type');
+    window.history.replaceState({}, '', APP_URL);
+    return;
+  }
+
+  // Path 2: No URL params — check if we have a pending booking in localStorage
+  // This happens when Stripe Payment Link doesn't redirect back with params
+  const pendingRef = localStorage.getItem('cs_pending_ref');
+  const pendingType = localStorage.getItem('cs_pending_type');
+  if (pendingRef) {
+    // Poll the DB to see if this booking was paid (Stripe webhook may have updated it)
+    pollForPayment(pendingRef, pendingType);
+  }
+}
+
+async function pollForPayment(ref, type) {
+  // Poll up to 10 times (20 seconds) to see if booking moved to paid
+  let attempts = 0;
+  const interval = setInterval(async () => {
+    attempts++;
+    const { data } = await sb.from('bookings')
+      .select('payment_status, status')
+      .eq('ref', ref)
+      .single();
+
+    if (data?.payment_status === 'paid') {
+      clearInterval(interval);
+      localStorage.removeItem('cs_pending_ref');
+      localStorage.removeItem('cs_pending_type');
+      toast('Payment confirmed! ✅', `Booking ${ref} is active`, 'green');
+      await loadBookings();
+      showScreen('bookings');
+      return;
+    }
+
+    if (attempts >= 10) {
+      clearInterval(interval);
+      // Booking still pending — let user know to check bookings
+      toast('Check your bookings', 'Payment may have been processed — check My Bookings', 'amber');
+    }
+  }, 2000);
 }
 
 // Pending deep link — stored so loadOCMForLocation can trigger it when chargers load
@@ -1804,6 +1850,9 @@ async function doPayment() {
   const stripeUrl = new URL(STRIPE_LINKS[payType]);
   stripeUrl.searchParams.set('client_reference_id', ref);
   if (currentUser?.email) stripeUrl.searchParams.set('prefilled_email', currentUser.email);
+  // Store ref in localStorage so we can recover it when Stripe redirects back
+  localStorage.setItem('cs_pending_ref', ref);
+  localStorage.setItem('cs_pending_type', payType);
 
   closePaySheet();
   window.location.href = stripeUrl.toString();
