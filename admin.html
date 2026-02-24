@@ -1,0 +1,405 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ChargeSpot Admin</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700;800;900&family=JetBrains+Mono:wght@400;500&display=swap');
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#06090d;--surface:#0c1018;--surface2:#111820;--border:#1a2535;
+  --green:#00ff87;--amber:#ffb800;--blue:#00c8ff;--red:#ff4757;
+  --text:#f0f7ff;--text-mid:#8899aa;--text-dim:#445566;
+  --accent:#00c8ff;--accent2:#0066ff;
+}
+body{font-family:'Outfit',sans-serif;background:var(--bg);color:var(--text);min-height:100vh}
+
+/* LOGIN */
+#login-screen{display:flex;align-items:center;justify-content:center;min-height:100vh;padding:24px}
+.login-card{background:var(--surface);border:1px solid var(--border);border-radius:20px;padding:36px 28px;width:100%;max-width:380px}
+.login-logo{text-align:center;margin-bottom:28px}
+.login-bolt{font-size:40px;margin-bottom:8px}
+.login-title{font-size:24px;font-weight:900;letter-spacing:-0.5px}
+.login-title span{color:var(--accent)}
+.login-sub{font-size:12px;color:var(--text-dim);letter-spacing:2px;text-transform:uppercase;margin-top:4px}
+.f{margin-bottom:14px}
+.f label{font-size:11px;font-weight:700;color:var(--text-mid);letter-spacing:1px;text-transform:uppercase;display:block;margin-bottom:6px}
+.f input{width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:12px 14px;color:var(--text);font-family:'Outfit',sans-serif;font-size:14px;outline:none}
+.f input:focus{border-color:var(--accent)}
+.login-btn{width:100%;padding:14px;border-radius:12px;border:none;background:linear-gradient(135deg,var(--accent),var(--accent2));color:#000;font-family:'Outfit',sans-serif;font-size:15px;font-weight:800;cursor:pointer;margin-top:4px}
+.err-msg{font-size:12px;color:var(--red);text-align:center;margin-top:10px;min-height:18px}
+
+/* DASHBOARD */
+#dashboard{display:none;max-width:700px;margin:0 auto;padding:20px 16px 40px}
+.dash-header{display:flex;align-items:center;gap:10px;margin-bottom:24px;padding-bottom:16px;border-bottom:1px solid var(--border)}
+.dash-logo{font-size:18px;font-weight:900;letter-spacing:-0.5px}
+.dash-logo span{color:var(--accent)}
+.dash-badge{background:var(--accent);color:#000;font-size:9px;font-weight:800;letter-spacing:2px;padding:3px 8px;border-radius:20px}
+.dash-updated{font-size:11px;color:var(--text-dim);margin-left:auto}
+.dash-signout{font-size:12px;color:var(--text-mid);cursor:pointer;margin-left:12px;text-decoration:underline}
+.dash-signout:hover{color:var(--red)}
+
+/* STATS */
+.section-title{font-size:11px;font-weight:700;color:var(--text-dim);letter-spacing:2px;text-transform:uppercase;margin:20px 0 10px}
+.stats-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px}
+.stats-grid-3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:10px}
+.stat-card{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:16px 14px}
+.stat-val{font-size:26px;font-weight:800;letter-spacing:-1px;line-height:1}
+.stat-lbl{font-size:11px;color:var(--text-mid);margin-top:4px;font-weight:600}
+.stat-sub{font-size:10px;color:var(--text-dim);margin-top:3px}
+.stat-trend{font-size:10px;margin-top:4px;font-weight:700}
+.trend-up{color:var(--green)}
+.trend-down{color:var(--red)}
+
+/* TABS */
+.tabs{display:flex;gap:6px;margin:20px 0 14px;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:4px}
+.tab{flex:1;padding:9px;border-radius:9px;border:none;background:none;color:var(--text-mid);font-family:'Outfit',sans-serif;font-size:12px;font-weight:700;cursor:pointer;transition:all .2s}
+.tab.active{background:var(--surface2);color:var(--text)}
+
+/* ROWS */
+.rows-card{background:var(--surface);border:1px solid var(--border);border-radius:14px;overflow:hidden}
+.admin-row{padding:14px 16px;border-bottom:1px solid var(--border);display:flex;align-items:flex-start;gap:12px}
+.admin-row:last-child{border-bottom:none}
+.admin-row-name{font-size:13px;font-weight:700;color:var(--text)}
+.admin-row-sub{font-size:11px;color:var(--text-mid);margin-top:2px}
+.admin-row-sub2{font-size:10px;color:var(--text-dim);margin-top:2px}
+.admin-row-val{font-size:14px;font-weight:800;color:var(--green)}
+.refund-flag{font-size:11px;color:var(--amber);font-weight:700;margin-top:4px}
+.empty-state{padding:32px;text-align:center;color:var(--text-dim);font-size:13px}
+
+/* STATUS PILLS */
+.sp{font-size:10px;font-weight:700;letter-spacing:.5px;padding:3px 8px;border-radius:20px;text-transform:uppercase}
+.sp-paid{background:#00ff8720;color:var(--green)}
+.sp-pending{background:#ffb80020;color:var(--amber)}
+.sp-refund{background:#ff475720;color:var(--red)}
+.sp-cancelled{background:#ffffff10;color:var(--text-dim)}
+.sp-checkin{background:#00c8ff20;color:var(--blue)}
+.sp-expired{background:#ff475710;color:var(--red)}
+
+/* REFUND BTN */
+.refund-btn{font-size:11px;font-weight:700;padding:5px 10px;border-radius:8px;border:1px solid var(--amber);background:transparent;color:var(--amber);cursor:pointer;margin-top:6px;font-family:'Outfit',sans-serif}
+.refund-btn:hover{background:#ffb80015}
+.refund-btn:disabled{opacity:.4;cursor:not-allowed}
+
+/* LOADING */
+.loading{display:flex;align-items:center;gap:10px;padding:20px 16px;color:var(--text-dim);font-size:13px}
+.spinner{width:16px;height:16px;border:2px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin .7s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* REFRESH */
+.refresh-btn{width:100%;margin-top:16px;padding:12px;border-radius:12px;border:1px solid var(--border);background:transparent;color:var(--text-mid);font-family:'Outfit',sans-serif;font-size:13px;font-weight:700;cursor:pointer}
+.refresh-btn:hover{border-color:var(--accent);color:var(--accent)}
+
+/* ACTIVITY BAR */
+.activity-bar-wrap{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:16px}
+.activity-bars{display:flex;align-items:flex-end;gap:4px;height:60px;margin-top:8px}
+.activity-bar{flex:1;background:var(--accent2);border-radius:4px 4px 0 0;min-height:3px;transition:height .4s;position:relative;cursor:default}
+.activity-bar:hover::after{content:attr(data-tip);position:absolute;bottom:110%;left:50%;transform:translateX(-50%);background:#1a2535;color:var(--text);font-size:10px;padding:3px 7px;border-radius:6px;white-space:nowrap;pointer-events:none}
+.activity-label{display:flex;justify-content:space-between;margin-top:6px}
+.activity-label span{font-size:9px;color:var(--text-dim)}
+
+/* SCAN COUNTER */
+.scan-row{display:flex;align-items:center;justify-content:space-between;padding:12px 14px;background:var(--surface2);border-radius:10px;margin-bottom:8px}
+.scan-label{font-size:12px;color:var(--text-mid)}
+.scan-val{font-size:14px;font-weight:800;color:var(--blue)}
+</style>
+</head>
+<body>
+
+<!-- LOGIN -->
+<div id="login-screen">
+  <div class="login-card">
+    <div class="login-logo">
+      <div class="login-bolt">⚡</div>
+      <div class="login-title">Charge<span>Spot</span></div>
+      <div class="login-sub">Admin Dashboard</div>
+    </div>
+    <div class="f"><label>Email</label><input id="email" type="email" placeholder="admin@chargespot.online" inputmode="email"></div>
+    <div class="f"><label>Password</label><input id="pass" type="password" placeholder="••••••••" onkeydown="if(event.key==='Enter')signIn()"></div>
+    <button class="login-btn" id="login-btn" onclick="signIn()">Sign In →</button>
+    <div class="err-msg" id="err-msg"></div>
+  </div>
+</div>
+
+<!-- DASHBOARD -->
+<div id="dashboard">
+  <div class="dash-header">
+    <div class="dash-logo">Charge<span>Spot</span></div>
+    <div class="dash-badge">ADMIN</div>
+    <div class="dash-updated" id="dash-updated">—</div>
+    <div class="dash-signout" onclick="signOut()">Sign Out</div>
+  </div>
+
+  <!-- REVENUE STATS -->
+  <div class="section-title">Revenue</div>
+  <div class="stats-grid">
+    <div class="stat-card">
+      <div class="stat-val" id="adm-revenue">—</div>
+      <div class="stat-lbl">Total Revenue</div>
+      <div class="stat-sub" id="adm-rev-sub">Loading...</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-val" id="adm-bookings">—</div>
+      <div class="stat-lbl">Total Bookings</div>
+      <div class="stat-sub" id="adm-bk-sub">Loading...</div>
+    </div>
+  </div>
+
+  <!-- BOOKING STATUS STATS -->
+  <div class="section-title">Booking Status</div>
+  <div class="stats-grid-3">
+    <div class="stat-card">
+      <div class="stat-val" id="adm-paid" style="color:var(--green)">—</div>
+      <div class="stat-lbl">Paid</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-val" id="adm-checkins" style="color:var(--blue)">—</div>
+      <div class="stat-lbl">Checked In</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-val" id="adm-refunds" style="color:var(--amber)">—</div>
+      <div class="stat-lbl">Refund Req</div>
+    </div>
+  </div>
+  <div class="stats-grid">
+    <div class="stat-card">
+      <div class="stat-val" id="adm-expired" style="color:var(--red)">—</div>
+      <div class="stat-lbl">Expired</div>
+      <div class="stat-sub">No check-in within 15 min</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-val" id="adm-pending" style="color:var(--text-mid)">—</div>
+      <div class="stat-lbl">Pending Payment</div>
+    </div>
+  </div>
+
+  <!-- 7-DAY ACTIVITY -->
+  <div class="section-title">Last 7 Days</div>
+  <div class="activity-bar-wrap">
+    <div class="activity-bars" id="activity-bars">
+      <div class="loading"><div class="spinner"></div>Loading...</div>
+    </div>
+    <div class="activity-label" id="activity-labels"></div>
+  </div>
+
+  <!-- TABS -->
+  <div class="tabs">
+    <button class="tab active" id="tab-bookings" onclick="switchTab('bookings')">All Bookings</button>
+    <button class="tab" id="tab-refunds" onclick="switchTab('refunds')">⚠️ Refunds</button>
+    <button class="tab" id="tab-expired" onclick="switchTab('expired')">Expired</button>
+  </div>
+
+  <!-- BOOKINGS LIST -->
+  <div class="rows-card" id="panel-bookings">
+    <div class="loading" id="bookings-loading"><div class="spinner"></div>Loading bookings...</div>
+    <div id="adm-bookings-list"></div>
+  </div>
+
+  <!-- REFUNDS PANEL -->
+  <div class="rows-card" id="panel-refunds" style="display:none">
+    <div id="adm-refunds-list"></div>
+  </div>
+
+  <!-- EXPIRED PANEL -->
+  <div class="rows-card" id="panel-expired" style="display:none">
+    <div id="adm-expired-list"></div>
+  </div>
+
+  <button class="refresh-btn" onclick="loadData()">↻ Refresh Data</button>
+</div>
+
+<script>
+const SUPABASE_URL = 'https://birdozrudsgfferqgolv.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJpcmRvenJ1ZHNnZmZlcnFnb2x2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzE2MzI4MzEsImV4cCI6MjA4NzIwODgzMX0.u8zKxOFHiMhfv1UTFImXV6Y7xR5CGjhSFY-iF9YQoRI';
+const ADMIN_EMAILS = ['hello@chargespot.online', 'azubuikedavies@gmail.com'];
+
+const { createClient } = supabase;
+const sb = createClient(SUPABASE_URL, SUPABASE_KEY);
+
+let allBookings = [];
+let currentTab = 'bookings';
+
+function isAdmin(email) { return ADMIN_EMAILS.includes((email||'').toLowerCase()); }
+
+// ── AUTH ──
+sb.auth.onAuthStateChange((event, session) => {
+  const user = session?.user || null;
+  if (user && isAdmin(user.email)) { showDashboard(); }
+  else if (user && !isAdmin(user.email)) { sb.auth.signOut(); showError('Access denied — admin only'); }
+});
+
+async function signIn() {
+  const email = document.getElementById('email').value.trim();
+  const pass = document.getElementById('pass').value;
+  if (!email || !pass) { showError('Enter email and password'); return; }
+  if (!isAdmin(email)) { showError('Access denied — admin only'); return; }
+  const btn = document.getElementById('login-btn');
+  btn.textContent = 'Signing in...'; btn.disabled = true;
+  const { error } = await sb.auth.signInWithPassword({ email, password: pass });
+  btn.textContent = 'Sign In →'; btn.disabled = false;
+  if (error) showError('Wrong email or password');
+}
+
+function signOut() {
+  sb.auth.signOut();
+  document.getElementById('dashboard').style.display = 'none';
+  document.getElementById('login-screen').style.display = 'flex';
+  document.getElementById('err-msg').textContent = '';
+}
+
+function showError(msg) { document.getElementById('err-msg').textContent = msg; }
+
+function showDashboard() {
+  document.getElementById('login-screen').style.display = 'none';
+  document.getElementById('dashboard').style.display = 'block';
+  loadData();
+}
+
+// ── TABS ──
+function switchTab(tab) {
+  currentTab = tab;
+  ['bookings','refunds','expired'].forEach(t => {
+    document.getElementById('tab-'+t).classList.toggle('active', t===tab);
+    document.getElementById('panel-'+t).style.display = t===tab ? 'block' : 'none';
+  });
+}
+
+// ── DATA ──
+async function loadData() {
+  document.getElementById('bookings-loading').style.display = 'flex';
+  document.getElementById('adm-bookings-list').innerHTML = '';
+
+  const { data } = await sb.from('bookings')
+    .select('*, chargers(name, address)')
+    .order('created_at', { ascending: false });
+
+  allBookings = data || [];
+  document.getElementById('bookings-loading').style.display = 'none';
+
+  renderStats();
+  renderActivityChart();
+  renderBookings();
+  renderRefunds();
+  renderExpired();
+
+  document.getElementById('dash-updated').textContent = 'Updated ' + new Date().toLocaleTimeString('en-GB');
+}
+
+function renderStats() {
+  const paid = allBookings.filter(b => b.payment_status === 'paid');
+  const checkins = allBookings.filter(b => b.status === 'checked_in');
+  const refunds = allBookings.filter(b => b.payment_status === 'refund_requested');
+  const expired = allBookings.filter(b => b.status === 'expired');
+  const pending = allBookings.filter(b => b.status === 'pending_payment');
+  const revenue = paid.reduce((sum, b) => sum + (b.payment_type === 'reservation' ? 1.50 : (b.kwh||10)*0.45), 0);
+
+  document.getElementById('adm-revenue').textContent = '£' + revenue.toFixed(2);
+  document.getElementById('adm-bookings').textContent = allBookings.length;
+  document.getElementById('adm-paid').textContent = paid.length;
+  document.getElementById('adm-checkins').textContent = checkins.length;
+  document.getElementById('adm-refunds').textContent = refunds.length;
+  document.getElementById('adm-expired').textContent = expired.length;
+  document.getElementById('adm-pending').textContent = pending.length;
+  document.getElementById('adm-rev-sub').textContent = paid.length + ' paid bookings';
+  document.getElementById('adm-bk-sub').textContent = allBookings.length + ' total';
+}
+
+function renderActivityChart() {
+  const bars = document.getElementById('activity-bars');
+  const labels = document.getElementById('activity-labels');
+  const days = [];
+  for (let i = 6; i >= 0; i--) {
+    const d = new Date(); d.setDate(d.getDate() - i);
+    const key = d.toISOString().slice(0,10);
+    const count = allBookings.filter(b => b.created_at?.slice(0,10) === key).length;
+    days.push({ key, count, label: d.toLocaleDateString('en-GB',{weekday:'short'}) });
+  }
+  const max = Math.max(...days.map(d => d.count), 1);
+  bars.innerHTML = days.map(d => {
+    const h = Math.max(3, Math.round((d.count / max) * 56));
+    return `<div class="activity-bar" style="height:${h}px;background:${d.count>0?'linear-gradient(180deg,var(--accent),var(--accent2))':'var(--border)'}" data-tip="${d.count} booking${d.count!==1?'s':''} on ${d.key}"></div>`;
+  }).join('');
+  labels.innerHTML = `<span>${days[0].label}</span><span>${days[3].label}</span><span>${days[6].label}</span>`;
+}
+
+function bookingRow(b, showRefundBtn = false) {
+  const isRefund = b.payment_status === 'refund_requested';
+  const isPaid = b.payment_status === 'paid';
+  const isCheckin = b.status === 'checked_in';
+  const isExpired = b.status === 'expired';
+  const isCancelled = b.status === 'cancelled';
+  const statusClass = isRefund ? 'sp-refund' : isCheckin ? 'sp-checkin' : isPaid ? 'sp-paid' : isExpired ? 'sp-expired' : isCancelled ? 'sp-cancelled' : 'sp-pending';
+  const statusLabel = isRefund ? 'Refund Req' : isCheckin ? 'Checked In' : isPaid ? 'Paid' : isExpired ? 'Expired' : isCancelled ? 'Cancelled' : 'Pending';
+  const amount = b.payment_type === 'reservation' ? '£1.50' : b.payment_type === 'session' ? '£' + ((b.kwh||10)*0.45).toFixed(2) : '—';
+  const date = new Date(b.created_at).toLocaleDateString('en-GB',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'});
+  return `<div class="admin-row">
+    <div style="flex:1">
+      <div class="admin-row-name">${b.name||'—'} · <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--accent)">${b.reg||'—'}</span></div>
+      <div class="admin-row-sub">${b.chargers?.name||'Unknown charger'}</div>
+      <div class="admin-row-sub2">🕐 ${b.booking_time||'—'} · Ref: ${b.ref} · ${date}</div>
+      ${isRefund ? '<div class="refund-flag">⚠️ REFUND REQUESTED — process in Stripe</div>' : ''}
+      ${showRefundBtn && isRefund ? `<button class="refund-btn" onclick="markRefundDone('${b.id}',this)">✓ Mark Refund Processed</button>` : ''}
+    </div>
+    <div style="text-align:right;flex-shrink:0">
+      <div class="admin-row-val">${amount}</div>
+      <div style="margin-top:4px"><span class="sp ${statusClass}">${statusLabel}</span></div>
+    </div>
+  </div>`;
+}
+
+function renderBookings() {
+  const el = document.getElementById('adm-bookings-list');
+  if (!allBookings.length) { el.innerHTML = '<div class="empty-state">No bookings yet</div>'; return; }
+  el.innerHTML = allBookings.slice(0,50).map(b => bookingRow(b)).join('');
+}
+
+function renderRefunds() {
+  const el = document.getElementById('adm-refunds-list');
+  const refunds = allBookings.filter(b => b.payment_status === 'refund_requested');
+  if (!refunds.length) { el.innerHTML = '<div class="empty-state">No refund requests ✅</div>'; return; }
+  el.innerHTML = refunds.map(b => bookingRow(b, true)).join('');
+}
+
+function renderExpired() {
+  const el = document.getElementById('adm-expired-list');
+  const expired = allBookings.filter(b => b.status === 'expired');
+  if (!expired.length) { el.innerHTML = '<div class="empty-state">No expired bookings ✅</div>'; return; }
+  el.innerHTML = expired.map(b => bookingRow(b)).join('');
+}
+
+async function markRefundDone(id, btn) {
+  if (!confirm('Mark this refund as processed? This will send a confirmation email to the driver.')) return;
+  btn.disabled = true; btn.textContent = 'Processing...';
+
+  const { error } = await sb.from('bookings')
+    .update({ payment_status: 'refunded', status: 'cancelled' })
+    .eq('id', id);
+
+  if (error) {
+    btn.disabled = false;
+    btn.textContent = '✓ Mark Refund Processed';
+    alert('Error: ' + error.message);
+    return;
+  }
+
+  // Send refund confirmation email via edge function
+  try {
+    await fetch(`${SUPABASE_URL}/functions/v1/send-refund`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${SUPABASE_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ booking_id: id })
+    });
+  } catch(e) {
+    console.log('Refund email failed (non-critical):', e.message);
+  }
+
+  await loadData();
+}
+</script>
+</body>
+</html>

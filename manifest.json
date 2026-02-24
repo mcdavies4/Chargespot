@@ -1,0 +1,32 @@
+{
+  "name": "ChargeSpot",
+  "short_name": "ChargeSpot",
+  "description": "Find, book and navigate to EV charging spots across the UK",
+  "start_url": "/index.html",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#080c10",
+  "theme_color": "#00c8ff",
+  "icons": [
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ],
+  "screenshots": [],
+  "categories": ["travel", "utilities"],
+  "shortcuts": [
+    {
+      "name": "Find Nearest Charger",
+      "short_name": "Nearest",
+      "description": "Instantly find the nearest available charger",
+      "url": "/index.html?action=nearest",
+      "icons": [{ "src": "icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "My Bookings",
+      "short_name": "Bookings",
+      "description": "View your active bookings",
+      "url": "/index.html?action=bookings",
+      "icons": [{ "src": "icon-192.png", "sizes": "192x192" }]
+    }
+  ]
+}

@@ -1,0 +1,461 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#080c10">
+<title>ChargeSpot — Charger Status</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#06090d;--surface:#0c1018;--surface2:#111820;--border:#1a2535;--border2:#1f2e42;
+  --green:#00ff87;--green-dim:#00ff8710;--green-glow:#00ff8740;
+  --amber:#ffb800;--amber-dim:#ffb80010;
+  --red:#ff4560;--red-dim:#ff456010;
+  --blue:#00c8ff;--blue-dim:#00c8ff10;
+  --text:#dce8f5;--text-dim:#4a5f78;--text-mid:#7a90a8;
+  --accent:#00c8ff;--accent2:#0066ff;
+}
+html,body{min-height:100vh;background:var(--bg);color:var(--text);font-family:'Syne',sans-serif}
+body{display:flex;flex-direction:column;align-items:center;background-image:radial-gradient(ellipse at 50% 0%,#00c8ff08 0%,transparent 60%),radial-gradient(ellipse at 0% 100%,#00ff8706 0%,transparent 50%);padding:0 0 40px}
+.topbar{width:100%;max-width:480px;padding:20px 24px 0;display:flex;align-items:center;justify-content:space-between}
+.logo{font-size:18px;font-weight:800;color:var(--text);letter-spacing:-.3px}
+.logo span{color:var(--accent)}
+.scan-badge{display:flex;align-items:center;gap:6px;font-size:11px;font-weight:600;color:var(--text-dim);font-family:'JetBrains Mono',monospace;letter-spacing:.5px}
+.scan-dot{width:6px;height:6px;border-radius:50%;background:var(--green);animation:blink 1.5s infinite}
+.card{width:100%;max-width:480px;margin:24px 0 0;padding:0 16px}
+.status-hero{background:var(--surface);border:1px solid var(--border);border-radius:24px;padding:32px 24px;margin-bottom:16px;position:relative;overflow:hidden;text-align:center}
+.sh-glow{position:absolute;top:-60px;left:50%;transform:translateX(-50%);width:200px;height:200px;border-radius:50%;pointer-events:none;transition:background .5s}
+.sh-icon{font-size:64px;margin-bottom:16px;position:relative;z-index:1;display:block;animation:float 3s ease-in-out infinite}
+.sh-status{font-size:28px;font-weight:800;margin-bottom:6px;letter-spacing:-.5px;position:relative;z-index:1}
+.sh-sub{font-size:14px;color:var(--text-dim);position:relative;z-index:1;line-height:1.5}
+.sh-name{font-size:16px;font-weight:700;color:var(--text);margin-top:16px;padding-top:16px;border-top:1px solid var(--border);position:relative;z-index:1}
+.sh-addr{font-size:13px;color:var(--text-mid);margin-top:4px;position:relative;z-index:1}
+.sh-meta{display:flex;gap:12px;justify-content:center;margin-top:12px;flex-wrap:wrap}
+.sh-meta-pill{font-size:11px;font-weight:600;padding:4px 10px;border-radius:20px;background:var(--surface2);border:1px solid var(--border2);color:var(--text-mid)}
+.slots-wrap{background:var(--surface);border:1px solid var(--border);border-radius:20px;padding:20px;margin-bottom:16px}
+.slots-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px}
+.slots-title{font-size:12px;font-weight:700;color:var(--text-dim);letter-spacing:2px;text-transform:uppercase;font-family:'JetBrains Mono',monospace}
+.slots-count{font-size:12px;font-weight:600;color:var(--text-mid)}
+.slots-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.slot-card{border-radius:14px;padding:16px 10px;text-align:center;border:1px solid var(--border2);transition:all .3s;position:relative;overflow:hidden}
+.slot-card.available{background:var(--green-dim);border-color:#00ff8730}
+.slot-card.busy{background:var(--amber-dim);border-color:#ffb80030}
+.slot-card.booked{background:var(--blue-dim);border-color:#00c8ff30}
+.slot-card.available::before,.slot-card.busy::before,.slot-card.booked::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;border-radius:14px 14px 0 0}
+.slot-card.available::before{background:var(--green)}
+.slot-card.busy::before{background:var(--amber)}
+.slot-card.booked::before{background:var(--blue)}
+.slot-label{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text-dim);margin-bottom:8px;letter-spacing:1px}
+.slot-icon{font-size:22px;margin-bottom:6px;display:block}
+.slot-status{font-size:12px;font-weight:700;margin-bottom:4px}
+.slot-card.available .slot-status{color:var(--green)}
+.slot-card.busy .slot-status{color:var(--amber)}
+.slot-card.booked .slot-status{color:var(--blue)}
+.slot-kw{font-size:11px;color:var(--text-dim)}
+.slot-ref{font-size:9px;color:var(--blue);margin-top:3px;font-family:'JetBrains Mono',monospace;letter-spacing:1px}
+.booking-info{background:var(--blue-dim);border:1px solid #00c8ff22;border-radius:16px;padding:16px;margin-bottom:16px}
+
+.bi-title{font-size:12px;font-weight:700;color:var(--blue);letter-spacing:1.5px;text-transform:uppercase;margin-bottom:10px;font-family:'JetBrains Mono',monospace}
+.bi-ref{font-family:'JetBrains Mono',monospace;font-size:22px;font-weight:700;color:var(--text);letter-spacing:3px;margin-bottom:8px}
+.bi-rows{display:flex;flex-direction:column;gap:6px}
+.bi-row{display:flex;justify-content:space-between;font-size:13px}
+.bi-label{color:var(--text-dim)}
+.bi-val{color:var(--text);font-weight:600}
+.honour-note{background:#1a1a0a;border:1px solid #ffb80025;border-radius:14px;padding:14px 16px;margin-bottom:16px;display:flex;gap:10px}
+.hn-icon{font-size:16px;flex-shrink:0;margin-top:1px}
+.hn-text{font-size:12px;color:#b89a40;line-height:1.6}
+.hn-text strong{color:#ffb800;display:block;margin-bottom:2px}
+.cta-stack{display:flex;flex-direction:column;gap:10px;margin-bottom:16px}
+.cta-btn{width:100%;padding:15px;border-radius:14px;border:none;font-family:'Syne',sans-serif;font-size:15px;font-weight:700;cursor:pointer;transition:all .2s;display:flex;align-items:center;justify-content:center;gap:8px;text-decoration:none}
+.cta-btn:active{transform:scale(.97)}
+.cta-primary{background:linear-gradient(135deg,var(--accent),var(--accent2));color:#000;box-shadow:0 4px 24px #00c8ff22}
+.cta-primary:hover{box-shadow:0 6px 32px #00c8ff44;transform:translateY(-1px)}
+.cta-secondary{background:var(--surface2);color:var(--text);border:1px solid var(--border2)}
+.notify-wrap{background:var(--surface);border:1px solid #ffb80033;border-radius:16px;padding:18px;margin-bottom:16px}
+.notify-title{font-size:13px;font-weight:700;color:var(--amber);margin-bottom:4px}
+.notify-sub{font-size:12px;color:var(--text-dim);margin-bottom:14px}
+.notify-form{display:flex;gap:8px}
+.notify-input{flex:1;background:var(--surface2);border:1px solid var(--border2);border-radius:10px;padding:11px 13px;font-family:'Syne',sans-serif;font-size:14px;color:var(--text);outline:none}
+.notify-input:focus{border-color:var(--amber)}
+.notify-input::placeholder{color:var(--text-dim)}
+.notify-btn{padding:11px 16px;border-radius:10px;border:none;background:var(--amber);color:#000;font-family:'Syne',sans-serif;font-size:13px;font-weight:700;cursor:pointer}
+.notify-success{font-size:13px;color:var(--green);font-weight:600;margin-top:8px;display:none}
+.reviews-wrap{background:var(--surface);border:1px solid var(--border);border-radius:20px;padding:20px;margin-bottom:16px}
+.reviews-title{font-size:12px;font-weight:700;color:var(--text-dim);letter-spacing:2px;text-transform:uppercase;font-family:'JetBrains Mono',monospace;margin-bottom:14px;display:flex;justify-content:space-between;align-items:center}
+.review-card{background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:14px;margin-bottom:10px}
+.rv-header{display:flex;align-items:center;gap:10px;margin-bottom:8px}
+.rv-avatar{width:30px;height:30px;border-radius:50%;background:linear-gradient(135deg,var(--accent),var(--accent2));display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;color:#000;flex-shrink:0}
+.rv-name{font-size:13px;font-weight:700;color:var(--text)}
+.rv-date{font-size:11px;color:var(--text-dim);margin-left:auto}
+.rv-stars{font-size:13px;margin-bottom:6px}
+.rv-text{font-size:12px;color:var(--text-mid);line-height:1.6}
+.roadmap-wrap{background:linear-gradient(135deg,#0a1628,#0e1f38);border:1px solid #00c8ff15;border-radius:16px;padding:18px;margin-bottom:16px}
+.rt-title{font-size:12px;font-weight:700;color:var(--accent);letter-spacing:1px;text-transform:uppercase;margin-bottom:12px}
+.rt-items{display:flex;flex-direction:column;gap:8px}
+.rt-item{display:flex;align-items:center;gap:10px;font-size:12px;color:var(--text-mid)}
+.rt-dot{width:20px;height:20px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:10px;flex-shrink:0}
+.refresh-row{display:flex;align-items:center;justify-content:center;gap:8px;font-size:12px;color:var(--text-dim);margin-bottom:20px}
+.refresh-btn{background:transparent;border:none;color:var(--accent);font-size:12px;font-weight:600;cursor:pointer;font-family:'Syne',sans-serif}
+.last-updated{font-family:'JetBrains Mono',monospace}
+.loading-screen{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:60vh;gap:16px}
+.loading-bolt{font-size:48px;animation:pulse 1s ease-in-out infinite}
+.loading-text{font-size:14px;color:var(--text-dim)}
+.error-screen{text-align:center;padding:60px 24px}
+.error-icon{font-size:48px;margin-bottom:16px}
+.error-title{font-size:20px;font-weight:700;color:var(--text);margin-bottom:8px}
+.error-sub{font-size:14px;color:var(--text-dim);line-height:1.6;margin-bottom:24px}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.3}}
+@keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-8px)}}
+@keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.6;transform:scale(.9)}}
+@keyframes fadeUp{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}}
+.fade-up{animation:fadeUp .4s ease forwards}
+</style>
+<!-- Google tag (gtag.js) -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-WW3QC0ST8H"></script>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+  gtag('config', 'G-WW3QC0ST8H');
+</script>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="logo">Charge<span>Spot</span></div>
+  <div class="scan-badge"><div class="scan-dot"></div>LIVE STATUS</div>
+</div>
+
+<div class="card" id="main-content">
+  <div class="loading-screen">
+    <div class="loading-bolt">⚡</div>
+    <div class="loading-text">Loading charger status...</div>
+  </div>
+</div>
+
+<script>
+const { createClient } = supabase;
+const sb = createClient(
+  'https://birdozrudsgfferqgolv.supabase.co',
+  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJpcmRvenJ1ZHNnZmZlcnFnb2x2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzE2MzI4MzEsImV4cCI6MjA4NzIwODgzMX0.u8zKxOFHiMhfv1UTFImXV6Y7xR5CGjhSFY-iF9YQoRI'
+);
+const OCM_KEY = '2fa247f0-d453-4689-a250-d042752a4134';
+const APP = 'https://chargespot.online';
+
+const params = new URLSearchParams(window.location.search);
+const chargerId = params.get('c');
+const bookingRef = params.get('ref');
+let charger = null, slots = [], reviews = [], lastUpdated = null;
+let currentUser = null;
+
+window.addEventListener('load', async () => {
+  if (!chargerId) { showError('No charger specified', 'Scan the QR code on the charger to see its status.'); return; }
+
+  // Track QR scan
+  if (typeof gtag !== 'undefined') {
+    gtag('event', 'qr_scan', {
+      event_category: 'engagement',
+      event_label: chargerId,
+      charger_id: chargerId
+    });
+  }
+
+  // Wait for auth session before loading (non-blocking — just gives it a chance)
+  try {
+    const { data: { session } } = await sb.auth.getSession();
+    currentUser = session?.user || null;
+  } catch(e) {}
+
+  loadStatus();
+  setInterval(loadStatus, 30000);
+});
+
+async function loadStatus() {
+  try {
+    const isOCM = String(chargerId).startsWith('ocm_');
+
+    if (isOCM) {
+      // Load from Open Charge Map API directly
+      await loadOCMCharger();
+    } else {
+      // Load from Supabase (manually added chargers)
+      await loadSupabaseCharger();
+    }
+
+    // Load reviews from Supabase regardless of source
+    const { data: rvData } = await sb.from('reviews').select('*').eq('charger_id', chargerId).order('created_at', { ascending: false }).limit(5);
+    reviews = rvData || [];
+
+    // Load booking if ref in URL
+    let booking = null;
+    if (bookingRef) {
+      const { data } = await sb.from('bookings').select('*').eq('ref', bookingRef).single();
+      booking = data;
+    }
+
+
+    lastUpdated = new Date();
+    renderStatus(booking);
+
+  } catch(e) {
+    console.error('loadStatus error:', e);
+    const msg = e?.name === 'AbortError' ? 'Request timed out — check your connection and try again.' : 'Could not load charger status. Please try again.';
+    showError('Connection error', msg);
+  }
+}
+
+async function loadOCMCharger() {
+  // Extract numeric OCM ID
+  const ocmId = chargerId.replace('ocm_', '');
+  const url = `https://api.openchargemap.io/v3/poi/?output=json&chargepointid=${ocmId}&compact=false&verbose=true&key=${OCM_KEY}`;
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 10000); // 10s timeout
+  const res = await fetch(url, { signal: controller.signal });
+  clearTimeout(timeout);
+  const data = await res.json();
+
+  if (!Array.isArray(data) || !data.length) throw new Error('Charger not found in OCM');
+
+  const poi = data[0];
+  const op = poi.OperatorInfo?.Title;
+  const street = poi.AddressInfo?.AddressLine1;
+  const town = poi.AddressInfo?.Town || poi.AddressInfo?.Postcode || 'UK';
+
+  charger = {
+    id: chargerId,
+    name: (op && !['Unknown','Unknown Operator'].includes(op)) ? `${op} — ${town}` : (street ? `${street}, ${town}` : `EV Charger — ${town}`),
+    address: [poi.AddressInfo?.AddressLine1, poi.AddressInfo?.Town, poi.AddressInfo?.Postcode].filter(Boolean).join(', '),
+    network: op || 'Independent',
+    lat: poi.AddressInfo?.Latitude,
+    lng: poi.AddressInfo?.Longitude,
+    price: poi.UsageCost || 'See network app',
+    connections: poi.Connections || [],
+  };
+
+  // Build slots from real OCM connection data
+  const conns = poi.Connections || [];
+  slots = conns.slice(0, 8).map((conn, i) => ({
+    id: `${chargerId}_${i}`,
+    charger_id: chargerId,
+    slot_label: String.fromCharCode(65 + i),
+    kw: conn.PowerKW || 7,
+    connector: conn.ConnectionType?.Title || '',
+    // Check Supabase bookings for this slot to determine if booked
+    status: 'available', // will be updated below
+  }));
+
+  // Check Supabase bookings to mark booked slots
+  const now = new Date();
+  const { data: activeBookings } = await sb.from('bookings')
+    .select('*')
+    .eq('charger_id', chargerId)
+    .eq('payment_status', 'paid')
+    .eq('status', 'paid');
+
+  if (activeBookings?.length) {
+    activeBookings.forEach((b, i) => {
+      if (slots[i]) slots[i].status = 'booked';
+    });
+  }
+}
+
+async function loadSupabaseCharger() {
+  const [chargerRes, slotsRes] = await Promise.all([
+    sb.from('chargers').select('*').eq('id', chargerId).single(),
+    sb.from('slots').select('*').eq('charger_id', chargerId)
+  ]);
+  if (chargerRes.error || !chargerRes.data) throw new Error('Charger not found');
+  charger = chargerRes.data;
+  slots = slotsRes.data || [];
+}
+
+function getDirectionsUrl() {
+  if (!charger) return '#';
+  const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+  if (charger.lat && charger.lng) {
+    if (isIOS) return `maps://maps.apple.com/?daddr=${charger.lat},${charger.lng}`;
+    return `https://www.google.com/maps/dir/?api=1&destination=${charger.lat},${charger.lng}`;
+  }
+  return `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(charger.address)}`;
+}
+
+
+function renderStatus(booking) {
+  const avail = slots.filter(s => s.status === 'available').length;
+  const busy = slots.filter(s => s.status === 'busy').length;
+  const booked = slots.filter(s => s.status === 'booked').length;
+  const total = slots.length;
+
+  let statusIcon, statusText, statusSub, statusColor, glowColor;
+  if (avail > 0) {
+    statusIcon = '✅'; statusText = `${avail} Slot${avail>1?'s':''} Free`;
+    statusSub = `${busy+booked} occupied · Pull up and plug in`;
+    statusColor = 'var(--green)'; glowColor = 'var(--green-glow)';
+  } else if (booked > 0 && avail === 0) {
+    statusIcon = '📅'; statusText = 'All Slots Reserved';
+    statusSub = 'All slots are pre-booked via ChargeSpot';
+    statusColor = 'var(--blue)'; glowColor = '#00c8ff30';
+  } else {
+    statusIcon = '⏳'; statusText = 'All Slots Occupied';
+    statusSub = 'Join the waitlist to be notified when a slot frees up';
+    statusColor = 'var(--amber)'; glowColor = '#ffb80030';
+  }
+
+  const conns = charger.connections || [];
+  const maxKw = slots.length ? Math.max(...slots.map(s => s.kw || 0)) : (conns[0]?.PowerKW || 0);
+  const connTypes = [...new Set(conns.map(c => c.ConnectionType?.Title).filter(Boolean))].slice(0,2).join(' · ');
+
+  const slotCards = slots.map(s => {
+    const icon = s.status === 'available' ? '⚡' : s.status === 'booked' ? '📅' : '🔌';
+    const label = s.status === 'available' ? 'Free' : s.status === 'booked' ? 'Reserved' : 'In Use';
+    const mySlot = booking?.slot_id === s.id || booking?.charger_id === chargerId;
+    return `<div class="slot-card ${s.status}">
+      <div class="slot-label">SLOT ${s.slot_label}</div>
+      <span class="slot-icon">${icon}</span>
+      <div class="slot-status">${label}</div>
+      <div class="slot-kw">${s.kw || '?'}kW${s.connector ? '<br><span style="font-size:9px">'+s.connector+'</span>' : ''}</div>
+      ${mySlot && booking ? `<div class="slot-ref">${booking.ref}</div>` : ''}
+    </div>`;
+  }).join('') || '<div style="color:var(--text-dim);font-size:13px;grid-column:1/-1;text-align:center;padding:8px">No slot data available</div>';
+
+  const bookingInfoHTML = booking ? `
+    <div class="booking-info fade-up">
+      <div class="bi-title">📅 Your Booking</div>
+      <div class="bi-ref">${booking.ref}</div>
+      <div class="bi-rows">
+        <div class="bi-row"><span class="bi-label">Name</span><span class="bi-val">${booking.name || '—'}</span></div>
+        <div class="bi-row"><span class="bi-label">Vehicle</span><span class="bi-val">${booking.reg || '—'}</span></div>
+        <div class="bi-row"><span class="bi-label">Time</span><span class="bi-val">${booking.booking_time || '—'}</span></div>
+        <div class="bi-row"><span class="bi-label">Duration</span><span class="bi-val">${booking.duration_minutes} min</span></div>
+        <div class="bi-row"><span class="bi-label">Status</span><span class="bi-val" style="color:${booking.payment_status==='paid'?'var(--green)':'var(--amber)'}">${booking.payment_status==='paid'?'✅ Paid & Confirmed':'⏳ Pending'}</span></div>
+      </div>
+    </div>` : '';
+
+  const reviewsHTML = reviews.length ? reviews.map(r => `
+    <div class="review-card">
+      <div class="rv-header">
+        <div class="rv-avatar">${(r.user_name||'?').slice(0,2).toUpperCase()}</div>
+        <div class="rv-name">${r.user_name || 'Driver'}</div>
+        <div class="rv-date">${new Date(r.created_at).toLocaleDateString('en-GB',{day:'numeric',month:'short'})}</div>
+      </div>
+      <div class="rv-stars">${'⭐'.repeat(r.stars)}${'☆'.repeat(5-r.stars)}</div>
+      <div class="rv-text">${r.text}</div>
+    </div>`).join('') : '<div style="font-size:12px;color:var(--text-dim);padding:4px 0">No reviews yet — book and leave the first one</div>';
+
+  const avgStars = reviews.length ? (reviews.reduce((a,r)=>a+r.stars,0)/reviews.length).toFixed(1) : null;
+
+  document.getElementById('main-content').innerHTML = `
+    <div class="status-hero fade-up">
+      <div class="sh-glow" style="background:radial-gradient(circle,${glowColor},transparent 70%)"></div>
+      <span class="sh-icon">${statusIcon}</span>
+      <div class="sh-status" style="color:${statusColor}">${statusText}</div>
+      <div class="sh-sub">${statusSub}</div>
+      <div class="sh-name">${charger.name}</div>
+      <div class="sh-addr">📍 ${charger.address || ''}</div>
+      <div class="sh-meta">
+        ${maxKw ? `<div class="sh-meta-pill">⚡ ${maxKw}kW</div>` : ''}
+        ${connTypes ? `<div class="sh-meta-pill">${connTypes}</div>` : ''}
+        ${charger.network && charger.network !== 'Independent' ? `<div class="sh-meta-pill">${charger.network}</div>` : ''}
+        ${avgStars ? `<div class="sh-meta-pill">⭐ ${avgStars}</div>` : ''}
+      </div>
+    </div>
+
+    ${bookingInfoHTML}
+
+    <div class="slots-wrap fade-up">
+      <div class="slots-header">
+        <div class="slots-title">Charging Slots</div>
+        <div class="slots-count">${avail}/${total} available</div>
+      </div>
+      <div class="slots-grid">${slotCards}</div>
+    </div>
+
+    <div class="honour-note fade-up">
+      <div class="hn-icon">🤝</div>
+      <div class="hn-text">
+        <strong>Honour System</strong>
+        ChargeSpot reservations are shown here so other drivers respect them. We're working on hardware-level enforcement with the charging networks. Please respect bookings — full refund if your slot is taken.
+      </div>
+    </div>
+
+    <div class="cta-stack fade-up">
+      ${avail > 0
+        ? `<a href="${APP}?cid=${chargerId}" class="cta-btn cta-primary" onclick="if(typeof gtag!=='undefined')gtag('event','book_slot_tap',{event_category:'conversion',event_label:chargerId,charger_id:chargerId})">⚡ Book This Slot — £1.50</a>`
+        : `<a href="${APP}" class="cta-btn cta-primary">📍 Find Nearest Available Charger</a>`
+      }
+      <a href="${getDirectionsUrl()}" class="cta-btn cta-secondary" ${/iPad|iPhone|iPod|Android/.test(navigator.userAgent)?'':'target="_blank"'}>🗺 Get Directions</a>
+    </div>
+
+    ${avail === 0 ? `
+    <div class="notify-wrap fade-up">
+      <div class="notify-title">🔔 Join the Waitlist</div>
+      <div class="notify-sub">We'll text you the moment a slot becomes available here</div>
+      <div class="notify-form">
+        <input class="notify-input" id="notify-phone" type="tel" placeholder="07700 900000" inputmode="tel">
+        <button class="notify-btn" onclick="submitNotify()">Notify Me</button>
+      </div>
+      <div class="notify-success" id="notify-success">✅ You're on the waitlist — we'll text you when a slot opens</div>
+    </div>` : ''}
+
+    <div class="reviews-wrap fade-up">
+      <div class="reviews-title">
+        <span>Driver Reviews</span>
+        ${avgStars ? `<span style="color:var(--amber);font-size:12px;font-family:inherit">⭐ ${avgStars} · ${reviews.length} review${reviews.length!==1?'s':''}</span>` : ''}
+      </div>
+      ${reviewsHTML}
+      <a href="${APP}" style="display:block;margin-top:12px;text-align:center;font-size:12px;color:var(--accent);text-decoration:none;font-weight:600">Open app to leave a review →</a>
+    </div>
+
+    <div class="roadmap-wrap fade-up">
+      <div class="rt-title">🚧 We're building something real</div>
+      <div class="rt-items">
+        <div class="rt-item"><div class="rt-dot" style="background:#00ff8720;color:var(--green)">✅</div>QR sticker reservations — live now</div>
+        <div class="rt-item"><div class="rt-dot" style="background:#00c8ff20;color:var(--accent)">🤝</div>Network API talks — Ubitricity, Pod Point</div>
+        <div class="rt-item"><div class="rt-dot" style="background:#ffffff10;color:var(--text-dim)">🔜</div>Hardware-enforced bookings — coming soon</div>
+      </div>
+      <div style="margin-top:12px;font-size:11px;color:var(--text-dim)">Your bookings help us prove demand. <a href="${APP}" style="color:var(--accent);text-decoration:none;font-weight:600">Join ChargeSpot →</a></div>
+    </div>
+
+    <div class="refresh-row">
+      <span class="last-updated">Updated ${lastUpdated.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit',second:'2-digit'})}</span>
+      <button class="refresh-btn" onclick="loadStatus()">↻ Refresh</button>
+    </div>
+
+    <div style="text-align:center;padding-bottom:8px">
+      <a href="${APP}" style="font-size:12px;color:var(--text-dim);text-decoration:none">Powered by <strong style="color:var(--accent)">ChargeSpot</strong></a>
+    </div>`;
+
+  setupRealtime();
+}
+
+function setupRealtime() {
+  sb.channel(`status-${chargerId}`)
+    .on('postgres_changes', { event:'*', schema:'public', table:'bookings', filter:`charger_id=eq.${chargerId}` }, () => loadStatus())
+    .on('postgres_changes', { event:'*', schema:'public', table:'slots', filter:`charger_id=eq.${chargerId}` }, () => loadStatus())
+    .subscribe();
+}
+
+async function submitNotify() {
+  const phone = document.getElementById('notify-phone')?.value.trim();
+  if (!phone || phone.length < 10) return;
+  await sb.from('notify_requests').insert({ charger_id: chargerId, phone, created_at: new Date().toISOString() }).catch(()=>{});
+  document.getElementById('notify-success').style.display = 'block';
+  document.getElementById('notify-phone').style.display = 'none';
+  document.querySelector('.notify-btn').style.display = 'none';
+}
+
+function showError(title, sub) {
+  document.getElementById('main-content').innerHTML = `
+    <div class="error-screen fade-up">
+      <div class="error-icon">⚡</div>
+      <div class="error-title">${title}</div>
+      <div class="error-sub">${sub}</div>
+      <a href="${APP}" class="cta-btn cta-primary" style="display:inline-flex;text-decoration:none;max-width:280px;margin:0 auto">Open ChargeSpot App</a>
+    </div>`;
+}
+</script>
+</body>
+</html>

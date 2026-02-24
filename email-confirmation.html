@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ChargeSpot Booking Confirmed</title>
+</head>
+<body style="margin:0;padding:0;background:#f0f4f8;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;">
+<table width="100%" cellpadding="0" cellspacing="0" style="background:#f0f4f8;padding:40px 16px">
+  <tr><td align="center">
+    <table width="100%" cellpadding="0" cellspacing="0" style="max-width:520px">
+
+      <!-- LOGO -->
+      <tr><td align="center" style="padding-bottom:24px">
+        <div style="background:linear-gradient(135deg,#00c8ff,#0066ff);border-radius:16px;padding:14px 24px;display:inline-block;text-align:center">
+          <div style="font-size:28px">⚡</div>
+          <div style="color:#000;font-size:18px;font-weight:900;letter-spacing:-0.5px">ChargeSpot</div>
+          <div style="color:rgba(0,0,0,0.6);font-size:9px;letter-spacing:2px;text-transform:uppercase">UK EV Charging</div>
+        </div>
+      </td></tr>
+
+      <!-- CARD -->
+      <tr><td style="background:#fff;border-radius:20px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,0.08)">
+
+        <!-- TOP BANNER -->
+        <table width="100%" cellpadding="0" cellspacing="0">
+          <tr><td style="background:linear-gradient(135deg,#00c8ff,#0066ff);padding:28px 32px;text-align:center">
+            <div style="font-size:48px;margin-bottom:10px">✅</div>
+            <div style="color:#fff;font-size:22px;font-weight:800;margin-bottom:6px">Booking Confirmed!</div>
+            <div style="color:rgba(255,255,255,0.8);font-size:14px">Your EV charging slot is reserved</div>
+          </td></tr>
+        </table>
+
+        <!-- REF BOX -->
+        <table width="100%" cellpadding="0" cellspacing="0">
+          <tr><td style="padding:28px 32px 0;text-align:center">
+            <div style="color:#6a7a8a;font-size:11px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;margin-bottom:8px">Booking Reference</div>
+            <div style="background:#f0f7ff;border:2px solid #00c8ff;border-radius:12px;padding:16px 24px;display:inline-block">
+              <span style="font-family:'Courier New',monospace;font-size:28px;font-weight:700;color:#0044cc;letter-spacing:4px">{{BOOKING_REF}}</span>
+            </div>
+            <div style="color:#9aaabb;font-size:12px;margin-top:8px">Show this at the charger</div>
+          </td></tr>
+        </table>
+
+        <!-- DETAILS TABLE -->
+        <table width="100%" cellpadding="0" cellspacing="0" style="padding:24px 32px">
+          <tr><td>
+            <table width="100%" cellpadding="0" cellspacing="0" style="background:#f8fafc;border-radius:12px">
+              <tr><td style="padding:14px 18px;border-bottom:1px solid #e8f0f8">
+                <table width="100%"><tr>
+                  <td style="color:#6a7a8a;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px">📍 Charger</td>
+                  <td align="right" style="color:#1a2535;font-size:13px;font-weight:700">{{CHARGER_NAME}}</td>
+                </tr></table>
+              </td></tr>
+              <tr><td style="padding:14px 18px;border-bottom:1px solid #e8f0f8">
+                <table width="100%"><tr>
+                  <td style="color:#6a7a8a;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px">📍 Address</td>
+                  <td align="right" style="color:#1a2535;font-size:13px;font-weight:600">{{CHARGER_ADDRESS}}</td>
+                </tr></table>
+              </td></tr>
+              <tr><td style="padding:14px 18px;border-bottom:1px solid #e8f0f8">
+                <table width="100%"><tr>
+                  <td style="color:#6a7a8a;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px">🕐 Time</td>
+                  <td align="right" style="color:#1a2535;font-size:13px;font-weight:700">{{BOOKING_TIME}}</td>
+                </tr></table>
+              </td></tr>
+              <tr><td style="padding:14px 18px;border-bottom:1px solid #e8f0f8">
+                <table width="100%"><tr>
+                  <td style="color:#6a7a8a;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px">🚗 Vehicle</td>
+                  <td align="right" style="color:#1a2535;font-size:13px;font-weight:600">{{VEHICLE_REG}}</td>
+                </tr></table>
+              </td></tr>
+              <tr><td style="padding:14px 18px">
+                <table width="100%"><tr>
+                  <td style="color:#6a7a8a;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px">💳 Paid</td>
+                  <td align="right" style="color:#0066cc;font-size:16px;font-weight:800">{{AMOUNT_PAID}}</td>
+                </tr></table>
+              </td></tr>
+            </table>
+          </td></tr>
+        </table>
+
+        <!-- HONOUR NOTE -->
+        <table width="100%" cellpadding="0" cellspacing="0">
+          <tr><td style="padding:0 32px 24px">
+            <div style="background:#fff8e6;border:1px solid #ffcc44;border-radius:12px;padding:14px 16px">
+              <div style="color:#8a6000;font-size:13px;font-weight:700;margin-bottom:4px">🤝 Honour System</div>
+              <div style="color:#8a6000;font-size:12px;line-height:1.6">Your slot is reserved and marked on our QR sticker at the charger. Other drivers see your booking when they scan. Please arrive within your booked window — cancel in the app if plans change.</div>
+            </div>
+          </td></tr>
+        </table>
+
+        <!-- BUTTONS -->
+        <table width="100%" cellpadding="0" cellspacing="0">
+          <tr><td style="padding:0 32px 32px;text-align:center">
+            <a href="https://chargespot.online" style="display:inline-block;background:linear-gradient(135deg,#00c8ff,#0066ff);color:#000;font-size:15px;font-weight:800;text-decoration:none;padding:14px 32px;border-radius:12px">
+              Open ChargeSpot →
+            </a>
+            <div style="margin-top:12px">
+              <a href="https://chargespot.online/status.html?c={{CHARGER_ID}}&ref={{BOOKING_REF}}" style="color:#0066cc;font-size:13px;font-weight:600;text-decoration:none">View live charger status →</a>
+            </div>
+          </td></tr>
+        </table>
+
+      </td></tr>
+
+      <!-- FOOTER -->
+      <tr><td style="padding:24px 0;text-align:center">
+        <div style="color:#9aaabb;font-size:12px;line-height:1.8">
+          ChargeSpot · Making EV charging stress-free<br>
+          Questions? <a href="/cdn-cgi/l/email-protection#553d3039393a15363d3427323026253a217b363a7b203e" style="color:#00c8ff;text-decoration:none"><span class="__cf_email__" data-cfemail="fe969b929291be9d969f8c999b8d8e918ad09d91d08b95">[email&#160;protected]</span></a><br>
+          <span style="font-size:11px;color:#b0bec5">You recei

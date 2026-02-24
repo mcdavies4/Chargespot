@@ -1,0 +1,2311 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="theme-color" content="#00c8ff">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="ChargeSpot">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon-192.png">
+<title>ChargeSpot — UK EV Charging</title>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+:root{
+  --bg:#080c10;--surface:#0e1420;--surface2:#141b28;--border:#1e2a3a;--border2:#243040;
+  --green:#00e676;--green-dim:#00e67618;--amber:#ffab00;--amber-dim:#ffab0018;
+  --red:#ff3d3d;--red-dim:#ff3d3d18;--blue:#4fc3f7;--blue-dim:#4fc3f718;
+  --text:#e8f0f8;--text-dim:#6a7a8a;--text-mid:#9aaabb;
+  --accent:#00c8ff;--accent2:#0088ff;
+  --safe-top:env(safe-area-inset-top,0px);
+  --safe-bottom:env(safe-area-inset-bottom,0px);
+}
+html{height:100%;overflow:hidden}
+body{height:100%;background:var(--bg);color:var(--text);font-family:'Outfit',sans-serif;overflow:hidden}
+
+/* ── SCREENS ── */
+.screen{position:fixed;inset:0;display:none;flex-direction:column;background:var(--bg);padding-top:var(--safe-top)}
+.screen.active{display:flex}
+
+/* ── AUTH ── */
+#screen-auth{align-items:center;justify-content:center;padding:32px 28px;
+  background-image:radial-gradient(ellipse at 80% 10%,#00c8ff0a,transparent 50%),radial-gradient(ellipse at 10% 90%,#0088ff08,transparent 50%)}
+.auth-logo{text-align:center;margin-bottom:40px}
+.auth-bolt{width:72px;height:72px;background:linear-gradient(135deg,var(--accent),var(--accent2));border-radius:20px;display:flex;align-items:center;justify-content:center;font-size:36px;box-shadow:0 0 40px #00c8ff44;margin:0 auto 16px}
+.auth-name{font-size:32px;font-weight:900;letter-spacing:-1px}
+.auth-tag{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--accent);letter-spacing:2px;text-transform:uppercase;margin-top:4px}
+.auth-form{width:100%;max-width:380px}
+.auth-tabs{display:flex;background:var(--surface2);border-radius:12px;padding:4px;margin-bottom:24px;border:1px solid var(--border)}
+.auth-tab{flex:1;padding:10px;text-align:center;border-radius:9px;font-size:14px;font-weight:600;cursor:pointer;color:var(--text-dim);transition:all .2s}
+.auth-tab.active{background:var(--surface);color:var(--text);box-shadow:0 2px 8px rgba(0,0,0,.4)}
+.f{margin-bottom:14px}
+.f label{display:block;font-size:11px;font-weight:700;color:var(--text-dim);letter-spacing:1px;text-transform:uppercase;margin-bottom:6px}
+.f input{width:100%;background:var(--surface2);border:1px solid var(--border2);border-radius:12px;padding:14px 16px;font-family:'Outfit',sans-serif;font-size:16px;color:var(--text);outline:none;transition:border-color .2s}
+.f input:focus{border-color:var(--accent)}
+.f input::placeholder{color:var(--text-dim)}
+.auth-btn{width:100%;padding:15px;border-radius:12px;border:none;font-family:'Outfit',sans-serif;font-size:16px;font-weight:700;cursor:pointer;background:linear-gradient(135deg,var(--accent),var(--accent2));color:#000;box-shadow:0 4px 24px #00c8ff33;margin-top:6px;transition:all .2s}
+.auth-btn:active{transform:scale(.98)}
+.auth-div{display:flex;align-items:center;gap:12px;margin:20px 0}
+.auth-div-line{flex:1;height:1px;background:var(--border)}
+.auth-div-txt{font-size:12px;color:var(--text-dim)}
+.auth-google{width:100%;padding:14px;border-radius:12px;border:1px solid var(--border2);background:var(--surface2);font-family:'Outfit',sans-serif;font-size:15px;font-weight:600;color:var(--text);cursor:pointer;display:flex;align-items:center;justify-content:center;gap:10px;transition:all .2s}
+.auth-google:active{transform:scale(.98)}
+.auth-msg{border-radius:10px;padding:10px 14px;font-size:13px;margin-bottom:14px;display:none}
+.auth-msg.show{display:block}
+.auth-msg.err{background:var(--red-dim);color:var(--red);border:1px solid #ff3d3d33}
+.auth-msg.ok{background:var(--green-dim);color:var(--green);border:1px solid #00e67633}
+
+/* ── STATUS BAR ── */
+.status-bar{height:52px;background:var(--surface);border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 16px;gap:12px;flex-shrink:0}
+.sb-logo{font-size:18px;font-weight:900;color:var(--text);letter-spacing:-.5px}
+.sb-logo span{color:var(--accent)}
+.sb-live{display:flex;align-items:center;gap:4px;font-size:10px;font-weight:700;color:var(--green);letter-spacing:.5px}
+.live-dot{width:6px;height:6px;border-radius:50%;background:var(--green);animation:pulse 2s infinite}
+.sb-avatar{width:34px;height:34px;border-radius:50%;background:linear-gradient(135deg,var(--accent),var(--accent2));display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;color:#000;cursor:pointer}
+
+/* ── HOME ── */
+#screen-home{padding-top:var(--safe-top)}
+.home-scroll{flex:1;overflow-y:auto;padding:16px;padding-bottom:80px}
+.home-scroll::-webkit-scrollbar{display:none}
+.greeting-hey{font-size:13px;color:var(--text-dim)}
+.greeting-name{font-size:26px;font-weight:800;color:var(--text);letter-spacing:-.5px;margin-bottom:2px}
+.greeting-sub{font-size:12px;color:var(--text-dim);margin-bottom:20px}
+.quick-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:20px}
+.qs{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:14px 10px;text-align:center}
+.qs-val{font-size:22px;font-weight:800;font-family:'JetBrains Mono',monospace}
+.qs-lbl{font-size:10px;color:var(--text-dim);letter-spacing:.5px;text-transform:uppercase;margin-top:2px}
+.sec-title{font-size:11px;font-weight:700;color:var(--text-dim);letter-spacing:1.5px;text-transform:uppercase;margin-bottom:12px}
+.quick-actions{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:20px}
+.qa{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:18px 14px;cursor:pointer;transition:all .2s;position:relative;overflow:hidden}
+.qa:active{transform:scale(.97)}
+.qa.primary{background:linear-gradient(135deg,#001a2e,#002a40);border-color:#004060}
+.qa-icon{font-size:26px;margin-bottom:10px;display:block}
+.qa-label{font-size:14px;font-weight:700;color:var(--text);display:block}
+.qa-sub{font-size:11px;color:var(--text-dim);margin-top:2px;display:block}
+.qa.primary .qa-label{color:var(--accent)}
+.qa-glow{position:absolute;top:-20px;right:-20px;width:80px;height:80px;background:radial-gradient(circle,#00c8ff12,transparent 70%);border-radius:50%}
+
+/* ── NEARBY CARDS ── */
+.nc{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:14px;margin-bottom:10px;display:flex;align-items:center;gap:12px;cursor:pointer;transition:all .2s}
+.nc:active{transform:scale(.98);background:var(--surface2)}
+.nc-dot{width:12px;height:12px;border-radius:50%;flex-shrink:0}
+.nc-info{flex:1;min-width:0}
+.nc-name{font-size:14px;font-weight:700;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.nc-addr{font-size:11px;color:var(--text-dim);margin-top:2px}
+.nc-tags{display:flex;gap:6px;margin-top:5px}
+.nc-tag{font-size:10px;color:var(--text-mid);background:var(--surface2);padding:2px 7px;border-radius:4px;border:1px solid var(--border)}
+.nc-right{text-align:right;flex-shrink:0}
+.nc-slots{font-size:16px;font-weight:800;font-family:'JetBrains Mono',monospace}
+.nc-dist{font-size:11px;color:var(--text-dim);margin-top:2px}
+
+/* ── CHARGERS SCREEN ── */
+#screen-chargers{padding-top:var(--safe-top)}
+.search-wrap{padding:12px 16px;border-bottom:1px solid var(--border);position:relative;flex-shrink:0}
+.search-wrap input{width:100%;background:var(--surface2);border:1px solid var(--border2);border-radius:12px;padding:12px 16px 12px 40px;font-family:'Outfit',sans-serif;font-size:15px;color:var(--text);outline:none}
+.search-wrap input:focus{border-color:var(--accent)}
+.search-wrap input::placeholder{color:var(--text-dim)}
+.search-icon{position:absolute;left:28px;top:50%;transform:translateY(-50%);font-size:16px;color:var(--text-dim);pointer-events:none}
+.filter-row{display:flex;gap:8px;padding:10px 16px;overflow-x:auto;border-bottom:1px solid var(--border);flex-shrink:0}
+.filter-row::-webkit-scrollbar{display:none}
+.chip{padding:6px 14px;border-radius:999px;font-size:12px;font-weight:600;border:1px solid var(--border2);color:var(--text-dim);white-space:nowrap;cursor:pointer;flex-shrink:0;transition:all .15s}
+.chip.on{background:var(--accent2);border-color:var(--accent);color:#fff}
+.list-scroll{flex:1;overflow-y:auto;padding:12px;padding-bottom:80px}
+.list-scroll::-webkit-scrollbar{display:none}
+
+/* ── CHARGER CARD ── */
+.cc{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:14px;margin-bottom:10px;cursor:pointer;transition:all .2s}
+.cc:active{transform:scale(.98);background:var(--surface2)}
+.cc-row1{display:flex;align-items:flex-start;justify-content:space-between;gap:8px;margin-bottom:6px}
+.cc-name{font-size:14px;font-weight:700;color:var(--text);line-height:1.3;flex:1}
+.badge{padding:3px 9px;border-radius:999px;font-size:10px;font-weight:700;white-space:nowrap}
+.b-green{background:var(--green-dim);color:var(--green);border:1px solid #00e67633}
+.b-amber{background:var(--amber-dim);color:var(--amber);border:1px solid #ffab0033}
+.b-red{background:var(--red-dim);color:var(--red);border:1px solid #ff3d3d33}
+.cc-addr{font-size:12px;color:var(--text-dim);margin-bottom:8px}
+.cc-meta{display:flex;gap:10px;flex-wrap:wrap}
+.cc-meta span{font-size:11px;color:var(--text-mid)}
+.cc-dots{display:flex;gap:4px;margin-top:8px}
+.cd{width:10px;height:10px;border-radius:50%}
+.avail-bar{height:3px;background:var(--border);border-radius:2px;margin-top:8px;overflow:hidden}
+.avail-fill{height:100%;border-radius:2px;transition:width .5s}
+.api-badge{display:inline-flex;align-items:center;gap:4px;background:var(--blue-dim);border:1px solid #4fc3f733;border-radius:6px;padding:2px 7px;font-size:10px;color:var(--blue);font-weight:600;margin-bottom:6px}
+
+/* ── DETAIL ── */
+#screen-detail{padding-top:var(--safe-top)}
+.detail-scroll{flex:1;overflow-y:auto;padding-bottom:100px}
+.detail-scroll::-webkit-scrollbar{display:none}
+.detail-back{display:flex;align-items:center;gap:8px;padding:12px 16px;font-size:14px;font-weight:600;color:var(--accent);cursor:pointer;flex-shrink:0}
+.detail-hero{padding:0 16px 16px;border-bottom:1px solid var(--border)}
+.detail-name{font-size:22px;font-weight:800;color:var(--text);letter-spacing:-.5px;margin-bottom:4px}
+.detail-addr{font-size:13px;color:var(--text-dim)}
+.detail-net{font-size:12px;color:var(--text-mid);margin-top:2px}
+.d-stats{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;padding:16px;border-bottom:1px solid var(--border)}
+.ds{background:var(--surface2);border-radius:10px;padding:10px 6px;text-align:center}
+.ds-val{font-size:16px;font-weight:700;font-family:'JetBrains Mono',monospace}
+.ds-lbl{font-size:9px;color:var(--text-dim);letter-spacing:.5px;text-transform:uppercase;margin-top:2px}
+.slots-sec{padding:16px;border-bottom:1px solid var(--border)}
+.slots-title{font-size:11px;font-weight:700;color:var(--text-dim);letter-spacing:1px;text-transform:uppercase;margin-bottom:12px}
+.slots-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.slot{background:var(--surface2);border:1px solid var(--border2);border-radius:12px;padding:12px 8px;text-align:center;cursor:pointer;transition:all .2s}
+.slot:active:not(.s-occ):not(.s-bkd){transform:scale(.95)}
+.slot.s-occ{opacity:.5;cursor:not-allowed}
+.slot.s-bkd{border-color:var(--blue);background:var(--blue-dim)}
+.slot-lbl{font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text-dim);margin-bottom:5px}
+.slot-status{font-size:12px;font-weight:700;margin-bottom:3px}
+.slot-kw{font-size:11px;color:var(--text-dim)}
+.detail-actions{position:fixed;bottom:0;left:0;right:0;padding:10px 12px calc(10px + var(--safe-bottom));background:var(--surface);border-top:1px solid var(--border);display:flex;gap:8px;z-index:50}
+.da{flex:1;padding:12px 6px;border-radius:12px;border:none;font-family:'Outfit',sans-serif;font-size:13px;font-weight:700;cursor:pointer;transition:all .2s;min-width:0}
+.da:active{transform:scale(.97)}
+.da-book{background:linear-gradient(135deg,var(--accent),var(--accent2));color:#000;box-shadow:0 4px 20px #00c8ff33}
+.da-notify{background:var(--surface2);color:var(--amber);border:1px solid #ffab0033}
+.da-dir{background:var(--surface2);color:var(--text);border:1px solid var(--border2)}
+
+/* ── BOOKINGS ── */
+#screen-bookings{padding-top:var(--safe-top)}
+.bk-scroll{flex:1;overflow-y:auto;padding:16px;padding-bottom:80px}
+.bk-scroll::-webkit-scrollbar{display:none}
+.bk-card{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:16px;margin-bottom:12px}
+.bk-header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px}
+.bk-name{font-size:15px;font-weight:700;color:var(--text)}
+.bk-ref{font-family:'JetBrains Mono',monospace;font-size:11px;background:var(--green-dim);color:var(--green);padding:4px 10px;border-radius:8px;border:1px solid #00e67633}
+.bk-ref.paid{background:var(--blue-dim);color:var(--blue);border-color:#4fc3f733}
+.bk-addr{font-size:12px;color:var(--text-dim);margin-bottom:6px}
+.bk-meta{display:flex;gap:12px;font-size:12px;color:var(--text-mid);flex-wrap:wrap}
+.bk-cancel{margin-top:12px;background:transparent;border:1px solid #ff3d3d33;color:var(--red);border-radius:8px;padding:8px 14px;font-size:12px;font-weight:600;cursor:pointer;font-family:'Outfit',sans-serif;width:100%}
+
+/* ── REVIEWS ── */
+.review-card{background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:14px;margin-bottom:10px}
+.rv-header{display:flex;align-items:center;gap:10px;margin-bottom:8px}
+.rv-avatar{width:32px;height:32px;border-radius:50%;background:linear-gradient(135deg,var(--accent),var(--accent2));display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;color:#000;flex-shrink:0}
+.rv-name{font-size:13px;font-weight:700;color:var(--text)}
+.rv-date{font-size:11px;color:var(--text-dim);margin-left:auto}
+.rv-stars{font-size:14px;margin-bottom:6px}
+.rv-text{font-size:12px;color:var(--text-mid);line-height:1.6}
+.write-review-btn{width:100%;padding:12px;border-radius:10px;border:1px solid var(--border2);background:var(--surface2);font-family:'Outfit',sans-serif;font-size:13px;font-weight:700;color:var(--accent);cursor:pointer;margin-top:8px;transition:all .2s}
+.write-review-btn:hover{background:var(--blue-dim);border-color:var(--accent)}
+
+/* REVIEW SHEET */
+#review-sheet{position:fixed;inset:0;z-index:210;pointer-events:none}
+#review-sheet.open{pointer-events:all}
+#review-sheet .ps-backdrop{position:absolute;inset:0;background:#000000bb;opacity:0;transition:opacity .3s}
+#review-sheet.open .ps-backdrop{opacity:1}
+#review-sheet .ps-panel{position:absolute;bottom:0;left:0;right:0;background:var(--surface);border-radius:24px 24px 0 0;padding:0;transform:translateY(100%);transition:transform .35s cubic-bezier(.32,.72,0,1);max-height:90vh;overflow-y:auto}
+#review-sheet.open .ps-panel{transform:translateY(0)}
+.star-selector{display:flex;gap:8px;justify-content:center;margin:16px 0}
+.star-btn{font-size:32px;cursor:pointer;opacity:.3;transition:all .2s;background:none;border:none;padding:4px}
+.star-btn.active{opacity:1;transform:scale(1.15)}
+.review-inp{width:100%;background:var(--surface2);border:1px solid var(--border2);border-radius:12px;padding:14px;font-family:'Outfit',sans-serif;font-size:14px;color:var(--text);outline:none;resize:none;min-height:100px}
+.review-inp:focus{border-color:var(--accent)}
+
+/* ── WAITLIST / QUEUE ── */
+.queue-wrap{background:var(--surface2);border:1px solid var(--amber);border-radius:12px;padding:14px;margin-top:10px}
+.queue-title{font-size:12px;font-weight:700;color:var(--amber);margin-bottom:8px;text-transform:uppercase;letter-spacing:.5px}
+.queue-inp-row{display:flex;gap:8px}
+.queue-inp{flex:1;background:var(--surface);border:1px solid var(--border2);border-radius:8px;padding:10px 12px;font-family:'Outfit',sans-serif;font-size:13px;color:var(--text);outline:none}
+.queue-inp:focus{border-color:var(--amber)}
+.queue-btn{padding:10px 14px;border-radius:8px;border:none;background:var(--amber);color:#000;font-family:'Outfit',sans-serif;font-size:13px;font-weight:700;cursor:pointer;white-space:nowrap}
+.queue-joined{font-size:12px;color:var(--green);font-weight:600;margin-top:8px;display:none}
+
+/* ── PUSH NOTIFICATIONS ── */
+.notif-banner{background:linear-gradient(135deg,#0a1628,#0e1f38);border:1px solid #00c8ff22;border-radius:14px;padding:14px 16px;margin-bottom:16px;display:flex;align-items:center;gap:12px}
+.notif-icon{font-size:22px;flex-shrink:0}
+.notif-text{flex:1;font-size:12px;color:var(--text-mid);line-height:1.5}
+.notif-text strong{color:var(--text);display:block;margin-bottom:2px;font-size:13px}
+.notif-btn{padding:8px 14px;border-radius:8px;border:none;background:linear-gradient(135deg,var(--accent),var(--accent2));color:#000;font-family:'Outfit',sans-serif;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap;flex-shrink:0}
+
+/* ── PAYMENT SHEET ── */
+#pay-sheet{position:fixed;inset:0;z-index:200;pointer-events:none}
+#pay-sheet.open{pointer-events:all}
+.ps-backdrop{position:absolute;inset:0;background:rgba(0,0,0,.75);backdrop-filter:blur(8px);opacity:0;transition:opacity .3s}
+#pay-sheet.open .ps-backdrop{opacity:1}
+.ps-panel{position:absolute;bottom:0;left:0;right:0;background:var(--surface);border-radius:24px 24px 0 0;padding:0 0 calc(20px + var(--safe-bottom));transform:translateY(100%);transition:transform .4s cubic-bezier(.16,1,.3,1);max-height:92vh;overflow-y:auto}
+.ps-panel::-webkit-scrollbar{display:none}
+#pay-sheet.open .ps-panel{transform:translateY(0)}
+.ps-handle{width:40px;height:4px;background:var(--border2);border-radius:2px;margin:14px auto}
+.ps-body{padding:0 20px 16px}
+.ps-title{font-size:20px;font-weight:800;color:var(--text);margin-bottom:4px;letter-spacing:-.3px}
+.ps-sub{font-size:13px;color:var(--text-dim);margin-bottom:18px}
+.pay-types{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:18px}
+.pt{background:var(--surface2);border:2px solid var(--border2);border-radius:14px;padding:14px 12px;cursor:pointer;transition:all .2s;text-align:center;position:relative}
+.pt.sel{border-color:var(--accent);background:linear-gradient(135deg,#001a2e,#002040)}
+.pt.sel::after{content:'✓';position:absolute;top:8px;right:10px;font-size:12px;font-weight:700;color:var(--accent)}
+.pt-icon{font-size:24px;margin-bottom:6px;display:block}
+.pt-name{font-size:13px;font-weight:700;color:var(--text);margin-bottom:3px}
+.pt-desc{font-size:10px;color:var(--text-dim);margin-bottom:5px}
+.pt-price{font-family:'JetBrains Mono',monospace;font-size:14px;font-weight:700;color:var(--accent)}
+.pf{margin-bottom:12px}
+.pf label{display:block;font-size:11px;font-weight:700;color:var(--text-dim);letter-spacing:1px;text-transform:uppercase;margin-bottom:5px}
+.pf input,.pf select{width:100%;background:var(--surface2);border:1px solid var(--border2);border-radius:10px;padding:12px 13px;font-family:'Outfit',sans-serif;font-size:14px;color:var(--text);outline:none;transition:border-color .2s}
+.pf input:focus,.pf select:focus{border-color:var(--accent)}
+.pf select option{background:var(--surface2)}
+.tgrid{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-top:5px}
+.tc{padding:9px 4px;text-align:center;border-radius:9px;border:1px solid var(--border2);font-size:11px;font-weight:600;color:var(--text-dim);cursor:pointer;transition:all .15s;font-family:'JetBrains Mono',monospace}
+.tc.sel{background:var(--accent2);border-color:var(--accent);color:#fff}
+.tc.na{opacity:.3;cursor:not-allowed}
+.kwh-row{display:flex;justify-content:space-between;margin-bottom:8px}
+.kwh-val{font-family:'JetBrains Mono',monospace;font-size:22px;font-weight:700;color:var(--accent)}
+.kwh-km{font-size:11px;color:var(--text-dim);margin-top:2px}
+.kwh-cost{font-family:'JetBrains Mono',monospace;font-size:18px;font-weight:700;color:var(--green)}
+input[type=range]{width:100%;accent-color:var(--accent)}
+.summary{background:var(--surface2);border:1px solid var(--border2);border-radius:12px;padding:14px;margin-bottom:14px}
+.summary-title{font-size:10px;font-weight:700;color:var(--text-dim);letter-spacing:1.5px;text-transform:uppercase;margin-bottom:10px}
+.sum-row{display:flex;justify-content:space-between;font-size:13px;margin-bottom:7px}
+.sum-row:last-child{margin-bottom:0;padding-top:9px;border-top:1px solid var(--border);font-weight:700;font-size:14px}
+.sum-lbl{color:var(--text-mid)}
+.sum-val{color:var(--text);font-family:'JetBrains Mono',monospace}
+.pay-now-btn{width:100%;padding:15px;border-radius:12px;border:none;font-family:'Outfit',sans-serif;font-size:16px;font-weight:800;cursor:pointer;background:linear-gradient(135deg,var(--accent),var(--accent2));color:#000;box-shadow:0 4px 24px #00c8ff33;transition:all .2s;display:flex;align-items:center;justify-content:center;gap:8px}
+.pay-now-btn:active{transform:scale(.97)}
+.pay-now-btn:disabled{opacity:.5;cursor:not-allowed;transform:none}
+.cancel-btn{width:100%;padding:12px;border-radius:12px;border:1px solid var(--border2);background:var(--surface2);font-family:'Outfit',sans-serif;font-size:14px;font-weight:600;color:var(--text-mid);cursor:pointer;margin-top:8px;transition:all .2s}
+.honour-disclaimer{background:#1a1a0a;border:1px solid #ffb80030;border-radius:12px;padding:12px 14px;margin-bottom:14px;display:flex;gap:10px;align-items:flex-start}
+.hd-icon{font-size:16px;flex-shrink:0;margin-top:1px}
+.hd-text{font-size:11px;color:#b89a40;line-height:1.6}
+.hd-text strong{color:#ffb800;display:block;margin-bottom:2px}
+.bk-refund{margin-top:8px;width:100%;background:transparent;border:1px solid #ff456033;color:var(--red);border-radius:8px;padding:8px 14px;font-size:12px;font-weight:600;cursor:pointer;font-family:'Outfit',sans-serif;transition:all .2s}
+.bk-refund:hover{background:#ff456010}
+.refund-sent{margin-top:8px;font-size:12px;color:var(--green);text-align:center;font-weight:600;display:none}
+.security-note{display:flex;align-items:center;justify-content:center;gap:6px;font-size:11px;color:var(--text-dim);margin-top:10px}
+
+/* ── ADMIN SCREEN ── */
+#screen-admin{padding-top:var(--safe-top)}
+.admin-scroll{flex:1;overflow-y:auto;padding:16px;padding-bottom:80px}
+.admin-scroll::-webkit-scrollbar{display:none}
+.admin-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:20px}
+.admin-title{font-size:22px;font-weight:800;color:var(--text);letter-spacing:-.5px}
+.admin-badge{background:var(--amber-dim);color:var(--amber);border:1px solid #ffab0033;border-radius:8px;padding:4px 10px;font-size:11px;font-weight:700}
+.rev-cards{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:20px}
+.rev-card{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:16px;position:relative;overflow:hidden}
+.rev-card::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:linear-gradient(90deg,var(--accent),var(--accent2))}
+.rev-val{font-size:24px;font-weight:800;font-family:'JetBrains Mono',monospace;color:var(--accent);margin-bottom:4px}
+.rev-lbl{font-size:11px;color:var(--text-dim);text-transform:uppercase;letter-spacing:.5px}
+.rev-change{font-size:12px;color:var(--green);margin-top:4px;font-weight:600}
+.admin-section{background:var(--surface);border:1px solid var(--border);border-radius:16px;margin-bottom:16px;overflow:hidden}
+.admin-sec-title{padding:14px 16px;font-size:13px;font-weight:700;color:var(--text);border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between}
+.admin-row{padding:12px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:12px;font-size:13px}
+.admin-row:last-child{border-bottom:none}
+.admin-row-main{flex:1}
+.admin-row-name{font-weight:600;color:var(--text);margin-bottom:2px}
+.admin-row-sub{font-size:11px;color:var(--text-dim)}
+.admin-row-right{text-align:right}
+.admin-row-val{font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:700;color:var(--text)}
+.admin-row-lbl{font-size:10px;color:var(--text-dim);margin-top:1px}
+.status-pill{padding:3px 8px;border-radius:999px;font-size:10px;font-weight:700}
+.sp-paid{background:var(--green-dim);color:var(--green);border:1px solid #00e67633}
+.sp-pending{background:var(--amber-dim);color:var(--amber);border:1px solid #ffab0033}
+.sp-cancelled{background:var(--red-dim);color:var(--red);border:1px solid #ff3d3d33}
+
+/* ── BOTTOM NAV ── */
+.bottom-nav{position:fixed;bottom:0;left:0;right:0;height:calc(60px + var(--safe-bottom));background:var(--surface);border-top:1px solid var(--border);display:none;padding-bottom:var(--safe-bottom);z-index:100}
+.bottom-nav.show{display:flex}
+.nav-item{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;gap:3px;transition:all .2s;padding-top:8px}
+.nav-item:active{transform:scale(.9)}
+.nav-icon{font-size:20px;line-height:1}
+.nav-lbl{font-size:10px;font-weight:600;color:var(--text-dim);letter-spacing:.3px}
+.nav-item.active .nav-lbl{color:var(--accent)}
+
+/* ── TOAST ── */
+#toasts{position:fixed;top:calc(60px + var(--safe-top));left:12px;right:12px;z-index:400;pointer-events:none}
+.toast{background:var(--surface);border:1px solid var(--border2);border-radius:14px;padding:12px 16px;margin-bottom:8px;transform:translateY(-16px);opacity:0;transition:all .35s cubic-bezier(.16,1,.3,1);box-shadow:0 8px 32px rgba(0,0,0,.5);display:flex;align-items:center;gap:10px}
+.toast.show{transform:translateY(0);opacity:1}
+.toast-icon{font-size:20px;flex-shrink:0}
+.toast-title{font-size:13px;font-weight:700;color:var(--text)}
+.toast-sub{font-size:12px;color:var(--text-dim);margin-top:1px}
+.t-green{border-left:3px solid var(--green)}
+.t-amber{border-left:3px solid var(--amber)}
+.t-blue{border-left:3px solid var(--accent)}
+
+/* ── LOADING ── */
+.loading{display:flex;align-items:center;justify-content:center;padding:40px;color:var(--text-dim);font-size:13px;gap:10px}
+.spinner{width:20px;height:20px;border:2px solid var(--border2);border-top-color:var(--accent);border-radius:50%;animation:spin .6s linear infinite}
+
+/* ── INSTALL BANNER ── */
+#install-banner{position:fixed;top:calc(52px + var(--safe-top));left:12px;right:12px;background:var(--surface);border:1px solid var(--accent);border-radius:14px;padding:12px 14px;z-index:150;display:none;align-items:center;gap:10px;box-shadow:0 8px 32px rgba(0,0,0,.5)}
+#install-banner.show{display:flex}
+.ib-text{flex:1}
+.ib-title{font-size:13px;font-weight:700;color:var(--text);margin-bottom:1px}
+.ib-sub{font-size:11px;color:var(--text-dim)}
+.ib-install{padding:8px 14px;border-radius:8px;border:none;background:linear-gradient(135deg,var(--accent),var(--accent2));color:#000;font-family:'Outfit',sans-serif;font-size:12px;font-weight:700;cursor:pointer}
+.ib-x{background:transparent;border:none;color:var(--text-dim);font-size:16px;cursor:pointer;padding:4px}
+
+/* ANIMATIONS */
+@keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.5;transform:scale(.8)}}
+@keyframes spin{to{transform:rotate(360deg)}}
+@keyframes fadeUp{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
+.fade-up{animation:fadeUp .35s ease forwards}
+
+/* ── SPLASH LOADING SCREEN ── */
+/* ── SPLASH SCREEN ── */
+#screen-loading{
+  position:fixed;inset:0;z-index:999;
+  background:radial-gradient(ellipse at 50% 50%,#0a1628 0%,#04080f 100%);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  gap:0;overflow:hidden;
+  transition:opacity .6s ease;
+}
+#screen-loading.hide{opacity:0;pointer-events:none}
+
+/* Background glow */
+.splash-bg-glow{
+  position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);
+  width:300px;height:300px;border-radius:50%;
+  background:radial-gradient(circle,#00c8ff0a 0%,transparent 70%);
+  animation:bgBreath 3s ease-in-out infinite;
+  pointer-events:none;
+}
+
+/* Pulse rings */
+.splash-rings{
+  position:absolute;top:50%;left:50%;
+  transform:translate(-50%,-50%);
+  width:100px;height:100px;
+}
+.splash-ring{
+  position:absolute;top:50%;left:50%;
+  transform:translate(-50%,-50%);
+  border-radius:50%;
+  border:1.5px solid #00c8ff;
+  animation:ringPulse 2.4s ease-out infinite;
+  opacity:0;
+}
+.splash-ring:nth-child(1){width:100px;height:100px;animation-delay:0s}
+.splash-ring:nth-child(2){width:100px;height:100px;animation-delay:0.6s}
+.splash-ring:nth-child(3){width:100px;height:100px;animation-delay:1.2s}
+.splash-ring:nth-child(4){width:100px;height:100px;animation-delay:1.8s}
+
+/* Center bolt */
+.splash-center{
+  position:relative;z-index:2;
+  display:flex;flex-direction:column;align-items:center;gap:0;
+}
+.splash-bolt-wrap{
+  width:88px;height:88px;border-radius:26px;
+  background:linear-gradient(145deg,#00d4ff,#0055ff);
+  display:flex;align-items:center;justify-content:center;
+  font-size:44px;
+  box-shadow:0 0 0 0 #00c8ff40;
+  animation:boltGlow 2.4s ease-in-out infinite;
+  margin-bottom:24px;
+  position:relative;
+}
+.splash-bolt-wrap::after{
+  content:'';
+  position:absolute;inset:-2px;
+  border-radius:28px;
+  background:linear-gradient(145deg,#00d4ff40,#0055ff40);
+  z-index:-1;
+  filter:blur(8px);
+}
+
+/* Logo text */
+.splash-name{
+  font-size:30px;font-weight:900;color:#e8f4ff;
+  letter-spacing:-.8px;
+  opacity:0;
+  animation:splashTextIn .6s ease .3s forwards;
+}
+.splash-name em{color:var(--accent);font-style:normal}
+.splash-tagline{
+  font-family:'JetBrains Mono',monospace;
+  font-size:10px;font-weight:500;
+  color:#3a6a8a;letter-spacing:3px;text-transform:uppercase;
+  margin-top:6px;
+  opacity:0;
+  animation:splashTextIn .6s ease .5s forwards;
+}
+
+/* Loading dots */
+.splash-dots{
+  display:flex;gap:6px;margin-top:32px;
+  opacity:0;animation:splashTextIn .4s ease .7s forwards;
+}
+.splash-dot{
+  width:6px;height:6px;border-radius:50%;background:#00c8ff;
+  animation:dotBounce 1.2s ease-in-out infinite;
+}
+.splash-dot:nth-child(1){animation-delay:0s}
+.splash-dot:nth-child(2){animation-delay:.2s;background:#0088ff}
+.splash-dot:nth-child(3){animation-delay:.4s;background:#0044ff}
+
+/* Keyframes */
+@keyframes ringPulse{
+  0%{transform:translate(-50%,-50%) scale(1);opacity:.6}
+  100%{transform:translate(-50%,-50%) scale(4);opacity:0}
+}
+@keyframes boltGlow{
+  0%,100%{box-shadow:0 0 20px #00c8ff30,0 8px 32px rgba(0,0,0,.4)}
+  50%{box-shadow:0 0 50px #00c8ff60,0 8px 40px rgba(0,0,0,.4)}
+}
+@keyframes bgBreath{
+  0%,100%{transform:translate(-50%,-50%) scale(1);opacity:.6}
+  50%{transform:translate(-50%,-50%) scale(1.3);opacity:1}
+}
+@keyframes splashTextIn{
+  from{opacity:0;transform:translateY(8px)}
+  to{opacity:1;transform:translateY(0)}
+}
+@keyframes dotBounce{
+  0%,100%{transform:translateY(0);opacity:.4}
+  50%{transform:translateY(-6px);opacity:1}
+}
+</style>
+<meta name="description" content="ChargeSpot — Reserve EV charging spots across the UK before you drive. Find public chargers, book your slot, and navigate with ease. No more waiting at the charger.">
+<meta name="keywords" content="EV charging UK, electric vehicle charging, reserve EV charger, book charging spot, EV charger near me, public EV charging, UK charging network, electric car charging app">
+<meta name="robots" content="index, follow">
+<meta name="author" content="ChargeSpot">
+
+<!-- Open Graph -->
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://chargespot.online/">
+<meta property="og:title" content="ChargeSpot — Book EV Charging Spots Across the UK">
+<meta property="og:description" content="Find and reserve public EV charging spots near you. No more turning up to a busy charger. Book in advance, navigate directly, charge stress-free.">
+<meta property="og:image" content="https://chargespot.online/icon-512.png">
+<meta property="og:site_name" content="ChargeSpot">
+
+<!-- Twitter Card -->
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="ChargeSpot — Book EV Charging Spots Across the UK">
+<meta name="twitter:description" content="Find and reserve public EV charging spots near you. No more waiting. Book in advance, navigate directly, charge stress-free.">
+<meta name="twitter:image" content="https://chargespot.online/icon-512.png">
+
+<!-- Canonical -->
+<link rel="canonical" href="https://chargespot.online/">
+
+<!-- Structured Data -->
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "MobileApplication",
+  "name": "ChargeSpot",
+  "description": "Reserve EV charging spots across the UK before you drive. Find public chargers, book your slot, and navigate with ease.",
+  "url": "https://chargespot.online",
+  "applicationCategory": "TravelApplication",
+  "operatingSystem": "Web, iOS, Android",
+  "offers": {
+    "@type": "Offer",
+    "price": "0",
+    "priceCurrency": "GBP"
+  },
+  "aggregateRating": {
+    "@type": "AggregateRating",
+    "ratingValue": "4.8",
+    "ratingCount": "124"
+  },
+  "author": {
+    "@type": "Organization",
+    "name": "ChargeSpot",
+    "url": "https://chargespot.online"
+  }
+}
+</script>
+<!-- Google tag (gtag.js) -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-WW3QC0ST8H"></script>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+  gtag('config', 'G-WW3QC0ST8H');
+</script>
+</head>
+<body>
+
+<!-- ── SPLASH / LOADING ── -->
+<div id="screen-loading">
+  <!-- Background glow -->
+  <div class="splash-bg-glow"></div>
+
+  <!-- Expanding pulse rings -->
+  <div class="splash-rings">
+    <div class="splash-ring"></div>
+    <div class="splash-ring"></div>
+    <div class="splash-ring"></div>
+    <div class="splash-ring"></div>
+  </div>
+
+  <!-- Center content -->
+  <div class="splash-center">
+    <div class="splash-bolt-wrap">⚡</div>
+    <div class="splash-name">Charge<em>Spot</em></div>
+    <div class="splash-tagline">UK EV Charging</div>
+    <div class="splash-dots">
+      <div class="splash-dot"></div>
+      <div class="splash-dot"></div>
+      <div class="splash-dot"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ── AUTH ── -->
+<div id="screen-auth" class="screen">
+  <div class="auth-logo">
+    <div class="auth-bolt">⚡</div>
+    <div class="auth-name">ChargeSpot</div>
+    <div class="auth-tag">UK EV Charging</div>
+    <div style="font-size:10px;color:#3a5a7a;margin-top:4px;letter-spacing:.5px">BETA · HONOUR SYSTEM</div>
+  </div>
+  <div class="auth-form">
+    <div class="auth-tabs">
+      <div class="auth-tab active" onclick="switchAuthTab('login',this)">Sign In</div>
+      <div class="auth-tab" onclick="switchAuthTab('signup',this)">Sign Up</div>
+    </div>
+    <div class="auth-msg err" id="auth-err"></div>
+    <div class="auth-msg ok" id="auth-ok"></div>
+    <div id="login-form">
+      <div class="f"><label>Email</label><input id="li-email" type="email" placeholder="you@example.com" inputmode="email"></div>
+      <div class="f"><label>Password</label><input id="li-pass" type="password" placeholder="••••••••" onkeydown="if(event.key==='Enter')doSignIn()"></div>
+      <button class="auth-btn" onclick="doSignIn()">⚡ Sign In</button>
+    </div>
+    <div id="signup-form" style="display:none">
+      <div class="f"><label>Full Name</label><input id="su-name" type="text" placeholder="Your name"></div>
+      <div class="f"><label>Email</label><input id="su-email" type="email" placeholder="you@example.com"></div>
+      <div class="f"><label>Password</label><input id="su-pass" type="password" placeholder="Min. 6 characters" onkeydown="if(event.key==='Enter')doSignUp()"></div>
+      <button class="auth-btn" onclick="doSignUp()">Create Account →</button>
+    </div>
+    <div class="auth-div"><div class="auth-div-line"></div><div class="auth-div-txt">or</div><div class="auth-div-line"></div></div>
+    <button class="auth-google" onclick="doGoogle()">
+      <svg width="18" height="18" viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>
+      Continue with Google
+    </button>
+  </div>
+</div>
+
+<!-- ── HOME ── -->
+<div id="screen-home" class="screen">
+  <div class="status-bar">
+    <div class="sb-logo">Charge<span>Spot</span></div>
+    <div class="sb-live" style="margin-left:auto"><div class="live-dot"></div>LIVE</div>
+    <div class="sb-avatar" id="home-avatar" onclick="confirmSignOut()">?</div>
+  </div>
+  <div class="home-scroll">
+    <div style="margin-bottom:20px">
+      <div class="greeting-hey">Good <span id="tod">morning</span></div>
+      <div class="greeting-name" id="greet-name">Loading...</div>
+      <div class="greeting-sub">UK · <span id="date-str"></span></div>
+    </div>
+    <div class="quick-stats">
+      <div class="qs"><div class="qs-val" style="color:var(--green)" id="h-avail">—</div><div class="qs-lbl">Available</div></div>
+      <div class="qs"><div class="qs-val" style="color:var(--amber)" id="h-busy">—</div><div class="qs-lbl">In Use</div></div>
+      <div class="qs"><div class="qs-val" style="color:var(--red)" id="h-full">—</div><div class="qs-lbl">Full</div></div>
+    </div>
+    <div class="sec-title">QUICK ACTIONS</div>
+    <div class="quick-actions">
+      <div class="qa primary" onclick="focusPostcode()">
+        <div class="qa-glow"></div>
+        <span class="qa-icon">📍</span>
+        <span class="qa-label">Find Nearest</span>
+        <span class="qa-sub">Enter postcode or use GPS</span>
+      </div>
+      <div class="qa" onclick="goTo('bookings')">
+        <span class="qa-icon">📋</span>
+        <span class="qa-label">My Bookings</span>
+        <span class="qa-sub" id="bk-count-lbl">Loading...</span>
+      </div>
+      <div class="qa" onclick="goTo('chargers')">
+        <span class="qa-icon">⚡</span>
+        <span class="qa-label">Browse All</span>
+        <span class="qa-sub" id="charger-count-lbl">All chargers</span>
+      </div>
+      <div class="qa" onclick="requestNotifPermission()">
+        <span class="qa-icon">🔔</span>
+        <span class="qa-label">Alerts</span>
+        <span class="qa-sub" id="notif-lbl">Enable notifications</span>
+      </div>
+    </div>
+    <!-- BUILDING REAL BANNER -->
+    <div id="building-banner" style="background:linear-gradient(135deg,#0a1628,#0e1f38);border:1px solid #00c8ff22;border-radius:16px;padding:16px;margin-bottom:20px;position:relative;overflow:hidden">
+      <div style="position:absolute;top:-20px;right:-10px;font-size:80px;opacity:.04;pointer-events:none">⚡</div>
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
+        <div style="background:linear-gradient(135deg,#00c8ff,#0066ff);border-radius:8px;padding:6px 8px;font-size:14px">🚧</div>
+        <div style="font-size:13px;font-weight:800;color:var(--text)">We're building something bigger</div>
+        <div style="margin-left:auto;font-size:10px;background:#00c8ff15;color:var(--accent);padding:3px 8px;border-radius:20px;font-weight:700;border:1px solid #00c8ff22">BETA</div>
+      </div>
+      <div style="font-size:12px;color:var(--text-dim);line-height:1.7;margin-bottom:12px">
+        Right now ChargeSpot runs on an <strong style="color:var(--text-mid)">honour system</strong> — we show your reservation to other drivers via QR stickers on chargers. We can't physically lock a slot yet.<br><br>
+        We're in active talks with EV networks to enforce bookings at the hardware level. Your early bookings help us prove demand and unlock those partnerships.
+      </div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap">
+        <div style="font-size:11px;background:#00ff8710;color:var(--green);border:1px solid #00ff8722;border-radius:20px;padding:4px 10px;font-weight:600">✅ QR stickers live</div>
+        <div style="font-size:11px;background:#00c8ff10;color:var(--accent);border:1px solid #00c8ff22;border-radius:20px;padding:4px 10px;font-weight:600">🔜 Network API integration</div>
+        <div style="font-size:11px;background:#ffb80010;color:var(--amber);border:1px solid #ffb80022;border-radius:20px;padding:4px 10px;font-weight:600">🔜 Hardware enforcement</div>
+      </div>
+      <div style="margin-top:12px;padding-top:10px;border-top:1px solid #ffffff08;font-size:11px;color:var(--text-dim)">
+        Got feedback? <a href="/cdn-cgi/l/email-protection#0c64696060634c6f646d7e6b697f7c637822636260656269" style="color:var(--accent);text-decoration:none;font-weight:600"><span class="__cf_email__" data-cfemail="422a272e2e2d02212a2330252731322d366c2d2c2e2b2c27">[email&#160;protected]</span></a> · We read every message
+      </div>
+    </div>
+
+    <div class="sec-title">FIND CHARGERS</div>
+    <div style="display:flex;gap:8px;margin-bottom:14px">
+      <div style="position:relative;flex:1">
+        <span style="position:absolute;left:12px;top:50%;transform:translateY(-50%);font-size:15px;pointer-events:none">📍</span>
+        <input id="postcode-inp" type="text" placeholder="Enter postcode e.g. EC1V 9LT"
+          style="width:100%;background:var(--surface);border:1px solid var(--border2);border-radius:12px;padding:12px 12px 12px 38px;font-family:'Outfit',sans-serif;font-size:14px;color:var(--text);outline:none;text-transform:uppercase"
+          oninput="this.value=this.value.toUpperCase()"
+          onkeydown="if(event.key==='Enter')searchPostcode()"
+          onfocus="this.style.borderColor='var(--accent)'"
+          onblur="this.style.borderColor='var(--border2)'">
+      </div>
+      <button onclick="searchPostcode()" style="padding:0 14px;border-radius:12px;border:none;background:linear-gradient(135deg,var(--accent),var(--accent2));color:#000;font-family:'Outfit',sans-serif;font-size:13px;font-weight:700;cursor:pointer;white-space:nowrap;flex-shrink:0">Search</button>
+      <button onclick="findNearest()" title="Use GPS" style="padding:0 12px;border-radius:12px;border:1px solid var(--border2);background:var(--surface);font-size:18px;cursor:pointer;flex-shrink:0">🎯</button>
+    </div>
+    <div id="postcode-result" style="display:none;margin-bottom:12px"></div>
+    <div class="sec-title">NEARBY CHARGERS</div>
+    <div id="home-list"><div class="loading"><div class="spinner"></div>Loading live data...</div></div>
+  </div>
+</div>
+
+<!-- ── CHARGERS ── -->
+<div id="screen-chargers" class="screen">
+  <div class="status-bar">
+    <div class="sb-logo">Charge<span>Spot</span></div>
+    <div class="sb-live" style="margin-left:auto"><div class="live-dot"></div>LIVE</div>
+  </div>
+  <div class="search-wrap">
+    <span class="search-icon">🔍</span>
+    <input placeholder="Search or enter postcode e.g. E14 5AB..." id="search-inp" oninput="renderList()" onkeydown="if(event.key==='Enter')searchPostcodeChargers()">
+  </div>
+  <div class="filter-row">
+    <div class="chip on" onclick="setFilter('all',this)">All</div>
+    <div class="chip" onclick="setFilter('available',this)">✅ Available</div>
+    <div class="chip" onclick="setFilter('fast',this)">⚡ Fast 50kW+</div>
+    <div class="chip" onclick="setFilter('rapid',this)">🚀 Rapid 150kW+</div>
+    <div class="chip" onclick="setFilter('free',this)">🆓 Free</div>
+    <div class="chip" onclick="setFilter('ubitricity',this)">🏮 Ubitricity</div>
+  </div>
+  <div id="charger-postcode-banner" style="display:none;padding:8px 16px 0"></div>
+  <div class="list-scroll" id="charger-list"></div>
+</div>
+
+<!-- ── DETAIL ── -->
+<div id="screen-detail" class="screen">
+  <div class="status-bar">
+    <div style="font-size:14px;font-weight:600;color:var(--accent);cursor:pointer" onclick="goBack()">← Back</div>
+  </div>
+  <div class="detail-scroll">
+    <div class="detail-hero">
+      <div class="detail-name" id="d-name">—</div>
+      <div class="detail-addr" id="d-addr">—</div>
+      <div class="detail-net" id="d-net">—</div>
+      <div id="d-access-badge" style="margin-top:6px"></div>
+    </div>
+    <div class="d-stats" id="d-stats"></div>
+    <div class="slots-sec">
+      <div class="slots-title">CHARGING SLOTS</div>
+      <div class="slots-grid" id="d-slots"></div>
+    </div>
+    <div style="padding:16px">
+      <div class="sec-title" style="margin-bottom:10px;display:flex;align-items:center;justify-content:space-between">
+        <span>REVIEWS</span>
+        <span id="d-avg-stars" style="font-size:12px;color:var(--amber)"></span>
+      </div>
+      <div id="d-reviews"></div>
+      <button class="write-review-btn" onclick="openReviewSheet()">✍️ Write a Review</button>
+
+      <!-- WAITLIST SECTION — shown when full -->
+      <div id="queue-section" style="display:none;margin-top:16px">
+        <div class="queue-wrap">
+          <div class="queue-title">🔔 Join the Waitlist</div>
+          <div style="font-size:12px;color:var(--text-dim);margin-bottom:10px;line-height:1.5">All slots are currently booked. Leave your number and we'll text you when one frees up.</div>
+          <div class="queue-inp-row">
+            <input class="queue-inp" id="queue-phone" type="tel" placeholder="07700 900000">
+            <button class="queue-btn" onclick="joinQueue()">Notify Me</button>
+          </div>
+          <div class="queue-joined" id="queue-joined">✅ You're on the waitlist — we'll text you when a slot opens</div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="detail-actions">
+    <button class="da da-book" onclick="openPaySheet()" style="flex:2">⚡ Book & Pay</button>
+    <button class="da da-notify" id="d-notify-btn" onclick="toggleNotify()" style="flex:1">🔔 Alert</button>
+    <button class="da da-dir" onclick="openMaps()" style="flex:1">🗺 Map</button>
+  </div>
+</div>
+
+<!-- ── BOOKINGS ── -->
+<div id="screen-bookings" class="screen">
+  <div class="status-bar">
+    <div class="sb-logo">Charge<span>Spot</span></div>
+    <div style="font-size:13px;color:var(--text-dim);font-weight:600;margin-left:8px">My Bookings</div>
+  </div>
+  <div style="padding:16px 16px 0">
+    <div id="notif-banner" style="display:none" class="notif-banner">
+      <div class="notif-icon">🔔</div>
+      <div class="notif-text">
+        <strong>Stay on top of your bookings</strong>
+        Get reminders 30 mins before your slot and alerts when waitlisted chargers free up
+      </div>
+      <button class="notif-btn" onclick="requestPushPermission()">Enable</button>
+    </div>
+  </div>
+  <div class="bk-scroll" id="bk-list"></div>
+</div>
+
+<!-- ── ADMIN ── -->
+
+
+<!-- ── PAYMENT SHEET ── -->
+<!-- ── REVIEW SHEET ── -->
+<div id="review-sheet">
+  <div class="ps-backdrop" onclick="closeReviewSheet()"></div>
+  <div class="ps-panel">
+    <div class="ps-handle"></div>
+    <div class="ps-body">
+      <div class="ps-title">Leave a Review</div>
+      <div class="ps-sub" id="rv-charger-name">—</div>
+      <div class="star-selector" id="star-selector">
+        <button class="star-btn" data-val="1" onclick="setStars(1)">⭐</button>
+        <button class="star-btn" data-val="2" onclick="setStars(2)">⭐</button>
+        <button class="star-btn" data-val="3" onclick="setStars(3)">⭐</button>
+        <button class="star-btn" data-val="4" onclick="setStars(4)">⭐</button>
+        <button class="star-btn" data-val="5" onclick="setStars(5)">⭐</button>
+      </div>
+      <div style="font-size:12px;color:var(--text-dim);text-align:center;margin-bottom:14px" id="star-label">Tap to rate</div>
+      <div class="pf">
+        <label>Your experience</label>
+        <textarea class="review-inp" id="review-text" placeholder="What was the charger like? Was it working well? Any tips for other drivers?"></textarea>
+      </div>
+      <button class="pay-now-btn" style="margin-top:14px" onclick="submitReview()">✅ Submit Review</button>
+      <button class="cancel-btn" onclick="closeReviewSheet()">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<div id="pay-sheet">
+  <div class="ps-backdrop" onclick="closePaySheet()"></div>
+  <div class="ps-panel">
+    <div class="ps-handle"></div>
+    <div class="ps-body">
+      <div class="ps-title" id="ps-title">Book Slot</div>
+      <div class="ps-sub" id="ps-sub">Reserve your charging time</div>
+      <div class="pay-types">
+        <div class="pt sel" id="pt-res" onclick="selPayType('reservation')">
+          <span class="pt-icon">📅</span>
+          <div class="pt-name">Reserve</div>
+          <div class="pt-desc">Lock slot in advance</div>
+          <div class="pt-price">£1.50</div>
+        </div>
+        <div class="pt" id="pt-ses" onclick="selPayType('session')">
+          <span class="pt-icon">⚡</span>
+          <div class="pt-name">Pay per kWh</div>
+          <div class="pt-desc">Pay for energy used</div>
+          <div class="pt-price">£0.45/kWh</div>
+        </div>
+      </div>
+      <div id="res-fields">
+        <div class="pf"><label>Your Name</label><input id="ps-name" type="text" placeholder="Full name"></div>
+        <div class="pf"><label>Vehicle Reg</label><input id="ps-reg" type="text" placeholder="e.g. LN24 EVX" style="text-transform:uppercase"></div>
+        <div class="pf"><label>Time Slot</label><div class="tgrid" id="ps-tgrid"></div></div>
+        <div class="pf"><label>Duration</label>
+          <select id="ps-dur"><option value="30">30 min</option><option value="60" selected>1 hour</option><option value="90">1.5 hours</option><option value="120">2 hours</option></select>
+        </div>
+      </div>
+      <div id="ses-fields" style="display:none">
+        <div class="pf"><label>Your Name</label><input id="ps-name2" type="text" placeholder="Full name"></div>
+        <div class="pf"><label>Vehicle Reg</label><input id="ps-reg2" type="text" placeholder="e.g. LN24 EVX" style="text-transform:uppercase"></div>
+        <div class="pf">
+          <label>kWh needed</label>
+          <div class="kwh-row">
+            <div><div class="kwh-val"><span id="kwh-n">20</span> kWh</div><div class="kwh-km">≈ <span id="kwh-km">100</span>km range</div></div>
+            <div style="text-align:right"><div style="font-size:11px;color:var(--text-dim)">Cost</div><div class="kwh-cost">£<span id="kwh-c">9.00</span></div></div>
+          </div>
+          <input type="range" id="kwh-sl" min="5" max="80" value="20" oninput="updKwh(this.value)">
+          <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--text-dim);margin-top:3px"><span>5 kWh</span><span>80 kWh</span></div>
+        </div>
+      </div>
+      <div class="summary">
+        <div class="summary-title">ORDER SUMMARY</div>
+        <div class="sum-row"><span class="sum-lbl">Charger</span><span class="sum-val" id="sum-charger">—</span></div>
+        <div class="sum-row" id="sum-type-row"><span class="sum-lbl">ChargeSpot reservation</span><span class="sum-val">£1.50</span></div>
+        <div class="sum-row" id="sum-energy-row" style="display:none"><span class="sum-lbl" style="color:var(--text-dim);font-size:11px">+ Energy (paid to network)</span><span class="sum-val" style="color:var(--text-dim);font-size:11px" id="sum-energy-price">—</span></div>
+        <div class="sum-row" id="sum-time-row"><span class="sum-lbl">Time</span><span class="sum-val" id="sum-time">Not selected</span></div>
+        <div class="sum-row"><span class="sum-lbl" style="color:var(--text)">Total</span><span class="sum-val" style="color:var(--accent)" id="sum-total">£1.50</span></div>
+      </div>
+      <div id="d-price-info" style="background:var(--surface2);border:1px solid var(--border2);border-radius:12px;padding:14px 16px;margin-bottom:14px;display:none">
+        <div style="font-size:11px;font-weight:700;color:var(--text-dim);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px">💰 Charging Costs</div>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+          <span style="font-size:13px;color:var(--text-mid)">Energy cost</span>
+          <span style="font-size:13px;font-weight:700;color:var(--text)" id="d-price-network">—</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;align-items:center;padding-top:8px;border-top:1px solid var(--border)">
+          <span style="font-size:13px;color:var(--text-mid)">ChargeSpot reservation</span>
+          <span style="font-size:14px;font-weight:800;color:var(--accent)">£1.50</span>
+        </div>
+        <div style="font-size:11px;color:var(--text-dim);margin-top:8px;line-height:1.5">Energy cost paid directly to the network. £1.50 reserves your slot via ChargeSpot.</div>
+      </div>
+      <!-- PRICE BREAKDOWN BOX -->
+      <div id="d-price-box" style="display:none;background:var(--surface2);border:1px solid var(--border2);border-radius:14px;padding:14px 16px;margin-bottom:14px">
+        <div style="font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--text-dim);margin-bottom:10px">💰 Cost Breakdown</div>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+          <div>
+            <div style="font-size:13px;color:var(--text-mid)">Energy cost</div>
+            <div style="font-size:10px;color:var(--text-dim)">Paid directly to the charging network</div>
+          </div>
+          <div style="font-size:13px;font-weight:700;color:var(--text)" id="d-network-price">—</div>
+        </div>
+        <div style="height:1px;background:var(--border);margin-bottom:8px"></div>
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <div>
+            <div style="font-size:13px;color:var(--text-mid)">ChargeSpot reservation</div>
+            <div style="font-size:10px;color:var(--text-dim)">Guarantees your slot</div>
+          </div>
+          <div style="font-size:15px;font-weight:800;color:var(--accent)">£1.50</div>
+        </div>
+        <div id="d-price-note" style="display:none;margin-top:10px;font-size:11px;color:var(--text-dim);background:var(--surface);border-radius:8px;padding:8px;line-height:1.5"></div>
+      </div>
+      <div class="honour-disclaimer">
+        <div class="hd-icon">🤝</div>
+        <div class="hd-text">
+          <strong>Honour System — Please Read</strong>
+          ChargeSpot reservations cannot physically block a slot. If you arrive and find your slot occupied, tap "Slot Occupied" in My Bookings for a full refund. We rely on drivers respecting reservations.
+        </div>
+      </div>
+      <button class="pay-now-btn" id="pay-now-btn" onclick="doPayment()">🔒 Pay with Stripe — £1.50</button>
+      <button class="cancel-btn" onclick="closePaySheet()">Cancel</button>
+      <div class="security-note">🔒 Secured by <strong style="color:var(--text-mid)">Stripe</strong> · 256-bit SSL · <span style="color:#3a6a8a">Beta product</span></div>
+    </div>
+  </div>
+</div>
+
+<!-- ── BOTTOM NAV ── -->
+<nav class="bottom-nav" id="bottom-nav">
+  <div class="nav-item active" onclick="goTo('home')" id="nav-home"><span class="nav-icon">🏠</span><span class="nav-lbl">Home</span></div>
+  <div class="nav-item" onclick="goTo('chargers')" id="nav-chargers"><span class="nav-icon">⚡</span><span class="nav-lbl">Chargers</span></div>
+  <div class="nav-item" onclick="goTo('bookings')" id="nav-bookings"><span class="nav-icon">📋</span><span class="nav-lbl">Bookings</span></div>
+  <div class="nav-item" id="nav-admin" style="display:none" onclick="window.location.href='admin.html'"><span class="nav-icon">📊</span><span class="nav-lbl">Admin</span></div>
+</nav>
+
+<!-- ── INSTALL BANNER ── -->
+<div id="install-banner">
+  <span style="font-size:28px">⚡</span>
+  <div class="ib-text"><div class="ib-title">Install ChargeSpot</div><div class="ib-sub">Add to home screen for quick access</div></div>
+  <button class="ib-install" onclick="doInstall()">Install</button>
+  <button class="ib-x" onclick="document.getElementById('install-banner').classList.remove('show')">✕</button>
+</div>
+
+<div id="toasts"></div>
+
+<script data-cfasync="false" src="/cdn-cgi/scripts/5c5dd728/cloudflare-static/email-decode.min.js"></script><script>
+// ── CONFIG ──
+const SUPABASE_URL = 'https://birdozrudsgfferqgolv.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJpcmRvenJ1ZHNnZmZlcnFnb2x2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzE2MzI4MzEsImV4cCI6MjA4NzIwODgzMX0.u8zKxOFHiMhfv1UTFImXV6Y7xR5CGjhSFY-iF9YQoRI';
+const OCM_API_KEY = '2fa247f0-d453-4689-a250-d042752a4134';
+const ADMIN_EMAILS = ['hello@chargespot.online', 'azubuikedavies@gmail.com'];
+const isAdmin = (email) => ADMIN_EMAILS.includes((email || '').toLowerCase());
+const STRIPE_LINKS = {
+  reservation: 'https://buy.stripe.com/eVq14n3LM7nb9eReby7Re00',
+  session: 'https://buy.stripe.com/8x23cvbeecHv4YB3wU7Re01'
+};
+const APP_URL = 'https://chargespot.online';
+
+const { createClient } = supabase;
+const sb = createClient(SUPABASE_URL, SUPABASE_KEY);
+
+// ── STATE ──
+let currentUser = null;
+let chargers = [];
+let slots = {};
+let selectedCharger = null;
+let activeFilter = 'all';
+let selectedTime = null;
+let payType = 'reservation';
+let notifyList = {};
+let userBookings = [];
+let prevScreen = 'home';
+let installPrompt = null;
+let ocmLoaded = false;
+
+// ── PWA ──
+if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(() => {});
+window.addEventListener('beforeinstallprompt', e => {
+  e.preventDefault(); installPrompt = e;
+  setTimeout(() => document.getElementById('install-banner').classList.add('show'), 4000);
+});
+function doInstall() {
+  if (!installPrompt) return;
+  installPrompt.prompt();
+  installPrompt.userChoice.then(() => document.getElementById('install-banner').classList.remove('show'));
+}
+
+// ── AUTH ──
+let appReady = false;
+
+function hideSplash() {
+  const splash = document.getElementById('screen-loading');
+  if (splash) { splash.classList.add('hide'); setTimeout(() => splash.style.display = 'none', 400); }
+}
+
+function bootApp(session) {
+  if (appReady) return;
+  appReady = true;
+  hideSplash();
+  currentUser = session?.user || null;
+  const nav = document.getElementById('bottom-nav');
+  if (currentUser) {
+    showScreen('home');
+    nav.classList.add('show');
+    setGreeting();
+    checkReturnFromStripe();
+    loadData();
+    checkForChargerDeepLink();
+    setupRealtime();
+    updateNotifLabel();
+  } else {
+    showScreen('auth');
+    nav.classList.remove('show');
+  }
+}
+
+// onAuthStateChange fires first with INITIAL_SESSION — use this as the boot signal
+sb.auth.onAuthStateChange((event, session) => {
+  if (event === 'INITIAL_SESSION') {
+    // This is the reliable first event — boot from here
+    bootApp(session);
+  } else if (event === 'SIGNED_IN') {
+    // User just logged in — only run if bootApp hasn't already handled this session
+    if (appReady && currentUser?.id === session?.user?.id) return; // already booted with same user
+    currentUser = session?.user || null;
+    appReady = true;
+    hideSplash();
+    const nav = document.getElementById('bottom-nav');
+    showScreen('home');
+    nav.classList.add('show');
+    setGreeting();
+    checkReturnFromStripe();
+    loadData();
+    checkForChargerDeepLink();
+    setupRealtime();
+    updateNotifLabel();
+    const navAdmin = document.getElementById('nav-admin');
+    if (navAdmin) navAdmin.style.display = isAdmin(currentUser.email) ? 'flex' : 'none';
+  } else if (event === 'SIGNED_OUT') {
+    currentUser = null;
+    appReady = false;
+    document.getElementById('bottom-nav').classList.remove('show');
+    showScreen('auth');
+  }
+});
+
+// Fallback — if onAuthStateChange never fires within 4s, show auth
+setTimeout(() => { if (!appReady) { appReady = true; hideSplash(); showScreen('auth'); document.getElementById('bottom-nav').classList.remove('show'); } }, 2500);
+
+function switchAuthTab(tab, el) {
+  document.querySelectorAll('.auth-tab').forEach(t => t.classList.remove('active'));
+  el.classList.add('active');
+  document.getElementById('login-form').style.display = tab === 'login' ? 'block' : 'none';
+  document.getElementById('signup-form').style.display = tab === 'signup' ? 'block' : 'none';
+  ['auth-err','auth-ok'].forEach(id => document.getElementById(id).classList.remove('show'));
+}
+
+async function doSignIn() {
+  const email = document.getElementById('li-email').value.trim();
+  const pass = document.getElementById('li-pass').value;
+  if (!email || !pass) return showAuthErr('Please enter email and password');
+  const { error } = await sb.auth.signInWithPassword({ email, password: pass });
+  if (error) showAuthErr(error.message);
+}
+
+async function doSignUp() {
+  const name = document.getElementById('su-name').value.trim();
+  const email = document.getElementById('su-email').value.trim();
+  const pass = document.getElementById('su-pass').value;
+  if (!name || !email || !pass) return showAuthErr('Please fill in all fields');
+  if (pass.length < 6) return showAuthErr('Password must be 6+ characters');
+  const { error } = await sb.auth.signUp({ email, password: pass, options: { data: { full_name: name } } });
+  if (error) showAuthErr(error.message);
+  else { document.getElementById('auth-ok').textContent = '✅ Check your email to confirm, then sign in'; document.getElementById('auth-ok').classList.add('show'); }
+}
+
+async function doGoogle() {
+  const { error } = await sb.auth.signInWithOAuth({
+    provider: 'google',
+    options: {
+      redirectTo: 'https://chargespot.online',
+      queryParams: { access_type: 'offline', prompt: 'consent' }
+    }
+  });
+  if (error) showAuthErr('Google sign in failed: ' + error.message);
+}
+
+function confirmSignOut() {
+  if (confirm(`Signed in as ${currentUser?.email}\n\nSign out?`)) sb.auth.signOut();
+}
+
+function showAuthErr(msg) { const el = document.getElementById('auth-err'); el.textContent = msg; el.classList.add('show'); }
+
+// ── GREETING ──
+function setGreeting() {
+  if (!currentUser) return;
+  const h = new Date().getHours();
+  document.getElementById('tod').textContent = h < 12 ? 'morning' : h < 17 ? 'afternoon' : 'evening';
+  const meta = currentUser.user_metadata;
+  const name = (meta?.full_name || meta?.name || currentUser.email?.split('@')[0] || 'there').split(' ')[0];
+  document.getElementById('greet-name').textContent = name;
+  document.getElementById('home-avatar').textContent = name.slice(0,2).toUpperCase();
+  document.getElementById('date-str').textContent = new Date().toLocaleDateString('en-GB', { weekday:'short', day:'numeric', month:'short' });
+}
+
+// ── CHECK STRIPE RETURN ──
+function checkReturnFromStripe() {
+  const params = new URLSearchParams(window.location.search);
+  const payment = params.get('payment');
+  const ref = params.get('ref');
+  if (payment === 'success' && ref) {
+    toast('Payment confirmed!', `Booking ${ref} is active`, 'green');
+    markPaid(ref, params.get('type'));
+    window.history.replaceState({}, '', APP_URL);
+  } else if (payment === 'cancelled') {
+    toast('Payment cancelled', 'No charge was made', 'amber');
+    window.history.replaceState({}, '', APP_URL);
+  }
+}
+
+// Pending deep link — stored so loadOCMForLocation can trigger it when chargers load
+let pendingDeepLinkId = null;
+
+function checkForChargerDeepLink() {
+  const params = new URLSearchParams(window.location.search);
+  const cid = params.get('cid');
+  if (!cid) return;
+  // Clear the param from URL so refresh doesn't re-trigger
+  window.history.replaceState({}, '', APP_URL);
+  // Store pending ID so charger load callback can pick it up
+  pendingDeepLinkId = cid;
+  // Also start polling in case chargers already loaded or load quickly
+  const tryOpen = (attempts) => {
+    const match = chargers.find(c => c.id == cid || c.id === cid);
+    if (match) {
+      pendingDeepLinkId = null;
+      openDetail(match.id);
+    } else if (attempts > 0) {
+      setTimeout(() => tryOpen(attempts - 1), 1000);
+    } else {
+      // Final fallback — navigate to chargers screen so user isn't stuck
+      toast('Opening charger...', 'Loading charger data', 'blue');
+      showScreen('chargers');
+      pendingDeepLinkId = null;
+    }
+  };
+  setTimeout(() => tryOpen(30), 500);
+}
+
+// Called by loadOCMForLocation after chargers are set — resolves pending deep link
+function resolvePendingDeepLink() {
+  if (!pendingDeepLinkId) return;
+  const cid = pendingDeepLinkId;
+  const match = chargers.find(c => c.id == cid || c.id === cid);
+  if (match) {
+    pendingDeepLinkId = null;
+    openDetail(match.id);
+  }
+}
+
+async function markPaid(ref, type) {
+  await sb.from('bookings').update({ status: 'paid', payment_status: 'paid', payment_type: type }).eq('ref', ref);
+  await loadBookings();
+  // Fire push notification
+  const bk = userBookings.find(b => b.ref === ref);
+  if (bk) notifyBookingConfirmed(ref, bk.chargers?.name || 'charger', bk.booking_time);
+  // Send confirmation email via Edge Function
+  try {
+    await fetch(`${SUPABASE_URL}/functions/v1/send-confirmation`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${SUPABASE_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ booking_ref: ref })
+    });
+  } catch(e) {
+    console.log('Email send failed (non-critical):', e.message);
+  }
+}
+
+// ── OCM CACHE ──
+// Cache fetched areas so revisiting doesn't re-fetch
+const ocmCache = new Map(); // key: "lat,lng,radius" → charger array
+let currentAreaLabel = '';
+
+function cacheKey(lat, lng, radius) {
+  return `${lat.toFixed(3)},${lng.toFixed(3)},${radius}`;
+}
+
+// ── LOAD DATA ──
+async function loadData() {
+  await loadBookings();
+  // Try GPS first — works anywhere in the UK
+  if (navigator.geolocation) {
+    navigator.geolocation.getCurrentPosition(
+      pos => loadOCMForLocation(pos.coords.latitude, pos.coords.longitude, 'your location', 5),
+      ()  => loadOCMForLocation(52.4862, -1.8904, 'UK', 5)
+    );
+  } else {
+    loadOCMForLocation(52.4862, -1.8904, 'UK', 5);
+  }
+}
+
+// ── FETCH OCM FOR A SPECIFIC LOCATION ──
+async function loadOCMForLocation(lat, lng, label = '', radius = 3) {
+  if (OCM_API_KEY === 'YOUR_OPEN_CHARGE_MAP_API_KEY') return;
+  const key = cacheKey(lat, lng, radius);
+  currentAreaLabel = label;
+
+  // Serve from cache if available
+  if (ocmCache.has(key)) {
+    chargers = ocmCache.get(key);
+    buildSlots();
+    updateStats(); renderList(); renderHomeList();
+    resolvePendingDeepLink();
+    document.getElementById('charger-count-lbl').textContent = `${chargers.length} chargers near ${label}`;
+    toast('📍 From cache', `${chargers.length} chargers near ${label}`, 'blue');
+    return;
+  }
+
+  // Show loading
+  document.getElementById('home-list').innerHTML = '<div class="loading"><div class="spinner"></div>Finding chargers near ' + label + '...</div>';
+  document.getElementById('charger-list').innerHTML = '<div class="loading"><div class="spinner"></div>Loading live data...</div>';
+  document.getElementById('charger-count-lbl').textContent = 'Loading...';
+
+  try {
+    // Fetch current area + small surrounding grid for good coverage
+    const offsets = [
+      [0, 0],
+      [0.015, 0], [-0.015, 0],
+      [0, 0.02], [0, -0.02],
+      [0.015, 0.02], [-0.015, -0.02],
+    ];
+
+    const allData = [];
+    const seenIds = new Set();
+
+    await Promise.all(offsets.map(async ([dLat, dLng]) => {
+      try {
+        const url = `https://api.openchargemap.io/v3/poi/?output=json&countrycode=GB` +
+          `&latitude=${(lat + dLat).toFixed(5)}&longitude=${(lng + dLng).toFixed(5)}` +
+          `&distance=${radius}&distanceunit=KM&maxresults=100&compact=true&verbose=false&usagetypeid=1,4,5,7&key=${OCM_API_KEY}`;
+        const res = await fetch(url);
+        if (!res.ok) return;
+        const data = await res.json();
+        if (Array.isArray(data)) {
+          data.forEach(poi => {
+            if (!seenIds.has(poi.ID)) { seenIds.add(poi.ID); allData.push(poi); }
+          });
+        }
+      } catch(e) {}
+    }));
+
+    if (!allData.length) {
+      toast('No chargers found', `Nothing near ${label}`, 'amber');
+      return;
+    }
+
+    // Filter to public chargers only (UsageTypeID 1=Public, 4=Membership, 5=Pay at location, 7=Notice required)
+    const PUBLIC_TYPES = [1, 4, 5, 7];
+    const publicData = allData.filter(poi => {
+      const typeId = poi.UsageType?.ID ?? poi.UsageTypeID;
+      if (!typeId) return true; // include if unknown — better to show too many than too few
+      return PUBLIC_TYPES.includes(typeId);
+    });
+
+    console.log(`Filtered: ${publicData.length} public from ${allData.length} total`);
+
+    // Convert OCM data to ChargeSpot format
+    chargers = publicData.map(poi => ({
+      id: `ocm_${poi.ID}`,
+      name: (() => {
+        const op = poi.OperatorInfo?.Title;
+        const street = poi.AddressInfo?.AddressLine1;
+        const town = poi.AddressInfo?.Town || poi.AddressInfo?.Postcode || 'UK';
+        if (op && !['Unknown','Unknown Operator'].includes(op)) return `${op} — ${town}`;
+        if (street) return `${street}, ${town}`;
+        return `EV Charger — ${town}`;
+      })(),
+      address: [
+        poi.AddressInfo?.AddressLine1,
+        poi.AddressInfo?.Town,
+        poi.AddressInfo?.Postcode
+      ].filter(Boolean).join(', '),
+      network: (poi.OperatorInfo?.Title && !['Unknown','Unknown Operator'].includes(poi.OperatorInfo.Title))
+        ? poi.OperatorInfo.Title : 'Independent',
+      price: (() => {
+        const raw = poi.UsageCost;
+        if (!raw || raw.trim() === '') return null; // null = unknown
+        const lower = raw.toLowerCase();
+        // Detect free
+        if (lower.includes('free') && !lower.includes('free first')) return 'Free';
+        // Try to extract pence/kWh pattern e.g. "59p/kWh" or "£0.59/kWh"
+        const pMatch = raw.match(/(\d+\.?\d*)p\s*(?:per\s*)?(?:kwh|kw\/h)/i);
+        if (pMatch) return `${pMatch[1]}p/kWh`;
+        // Try £ per kWh
+        const poundMatch = raw.match(/£(\d+\.?\d*)\s*(?:\/|per\s*)(?:kwh|kw\/h)/i);
+        if (poundMatch) return `£${poundMatch[1]}/kWh`;
+        // Try per minute
+        const minMatch = raw.match(/(\d+\.?\d*)p\s*(?:per\s*)?min/i);
+        if (minMatch) return `${minMatch[1]}p/min`;
+        // Truncate long strings
+        if (raw.length > 22) return raw.substring(0, 20) + '…';
+        return raw;
+      })(),
+      priceRaw: poi.UsageCost || null,
+      rating: poi.GeneralComments ? 4.2 : 4.0,
+      tags: getOCMTags(poi),
+      lat: poi.AddressInfo?.Latitude,
+      lng: poi.AddressInfo?.Longitude,
+      ocm: true,
+      connections: poi.Connections || [],
+      accessType: (() => {
+        const id = poi.UsageType?.ID ?? poi.UsageTypeID;
+        if (id === 4) return 'membership';
+        if (id === 5) return 'pay-on-site';
+        if (id === 7) return 'notice-required';
+        return 'public';
+      })(),
+    }));
+
+    // Save to cache
+    ocmCache.set(key, chargers);
+
+    buildSlots();
+    ocmLoaded = true;
+    updateStats(); renderList(); renderHomeList();
+    resolvePendingDeepLink();
+    document.getElementById('charger-count-lbl').textContent = `${chargers.length} chargers near ${label}`;
+    toast('📍 Loaded', `${chargers.length} chargers near ${label}`, 'green');
+
+  } catch(e) {
+    console.error('OCM error:', e.message);
+    toast('Could not load live data', 'Check connection', 'amber');
+  }
+}
+
+function buildSlots() {
+  slots = {};
+  chargers.forEach(c => {
+    const conns = c.connections || [];
+    const numSlots = Math.min(conns.length || 2, 8);
+    slots[c.id] = Array.from({ length: numSlots }, (_, i) => ({
+      id: `${c.id}_${i}`,
+      charger_id: c.id,
+      slot_label: String.fromCharCode(65 + i),
+      kw: conns[i]?.PowerKW || 7,
+      status: Math.random() > 0.4 ? 'available' : 'busy',
+    }));
+  });
+}
+
+function mapLonToX(lng) {
+  // Map longitude range to 5-95%
+  if (!lng) return 50;
+  return Math.max(5, Math.min(95, ((lng - (-0.25)) / (0.05 - (-0.25))) * 90 + 5));
+}
+
+function mapLatToY(lat) {
+  // Map latitude range to 5-95%
+  if (!lat) return 50;
+  return Math.max(5, Math.min(95, ((51.58 - lat) / (51.58 - 51.45)) * 90 + 5));
+}
+
+function getAccessBadge(c) {
+  if (!c.accessType || c.accessType === 'public') return '';
+  const badges = {
+    'membership': '<span style="font-size:10px;background:#ffb80015;color:var(--amber);border:1px solid #ffb80030;border-radius:20px;padding:2px 7px;font-weight:600">🔑 Membership</span>',
+    'pay-on-site': '<span style="font-size:10px;background:#00ff8715;color:var(--green);border:1px solid #00ff8730;border-radius:20px;padding:2px 7px;font-weight:600">💳 Pay on site</span>',
+    'notice-required': '<span style="font-size:10px;background:#00c8ff15;color:var(--accent);border:1px solid #00c8ff30;border-radius:20px;padding:2px 7px;font-weight:600">📞 Notice required</span>',
+  };
+  return badges[c.accessType] || '';
+}
+
+function getOCMTags(poi) {
+  const tags = [];
+  const maxKw = Math.max(...(poi.Connections || []).map(c => c.PowerKW || 0));
+  if (maxKw >= 150) tags.push('rapid');
+  else if (maxKw >= 50) tags.push('fast');
+  if (poi.UsageCost?.toLowerCase().includes('free') || !poi.UsageCost) tags.push('free');
+  if (poi.OperatorInfo?.Title?.toLowerCase().includes('ubitricity') || poi.OperatorInfo?.Title?.toLowerCase().includes('shell')) tags.push('ubitricity');
+  return tags;
+}
+
+// ── REALTIME ──
+function setupRealtime() {
+  sb.channel('cs-realtime')
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'slots' }, payload => {
+      const s = payload.new || payload.old;
+      if (!s) return;
+      if (!slots[s.charger_id]) slots[s.charger_id] = [];
+      const idx = slots[s.charger_id].findIndex(x => x.id === s.id);
+      if (payload.eventType === 'DELETE') { if (idx > -1) slots[s.charger_id].splice(idx, 1); }
+      else { if (idx > -1) slots[s.charger_id][idx] = s; else slots[s.charger_id].push(s); }
+      if (notifyList[s.charger_id] && s.status === 'available') {
+        const c = chargers.find(x => x.id === s.charger_id);
+        sendNotif('⚡ Slot Available!', `${c?.name || 'Charger'} — Slot ${s.slot_label} is free`);
+        toast('Slot available!', `${c?.name}`, 'green');
+      }
+      updateStats(); renderList(); renderHomeList();
+      if (selectedCharger?.id === s.charger_id) renderDetailSlots();
+    }).subscribe();
+}
+
+// ── HELPERS ──
+function getSlots(id) { return slots[id] || []; }
+function getStatus(id) {
+  const s = getSlots(id);
+  if (!s.length) return 'available';
+  const a = s.filter(x => x.status === 'available').length;
+  return a === 0 ? 'full' : a === s.length ? 'available' : 'busy';
+}
+
+function updateStats() {
+  document.getElementById('h-avail').textContent = chargers.filter(c => getStatus(c.id) === 'available').length;
+  document.getElementById('h-busy').textContent = chargers.filter(c => getStatus(c.id) === 'busy').length;
+  document.getElementById('h-full').textContent = chargers.filter(c => getStatus(c.id) === 'full').length;
+}
+
+// ── POSTCODE SEARCH ──
+let userLat = null, userLng = null;
+
+async function searchPostcode() {
+  const raw = document.getElementById('postcode-inp').value.trim();
+  if (!raw) return toast('Enter a postcode', 'e.g. EC1V 9LT', 'amber');
+  const pc = raw.replace(/\s/g,'').toUpperCase();
+  if (pc.length < 3) return toast('Postcode too short', 'e.g. EC1V 9LT', 'amber');
+  const result = await postcodeToLatLng(pc);
+  if (!result) return;
+  userLat = result.lat; userLng = result.lng;
+  // Load fresh OCM data for this postcode area
+  await loadOCMForLocation(result.lat, result.lng, result.display, 2);
+  // Show banner
+  const banner = document.getElementById('postcode-result');
+  banner.style.display = 'block';
+  banner.innerHTML = `<div style="background:var(--green-dim);border:1px solid #00e67633;border-radius:10px;padding:10px 14px;font-size:13px;color:var(--green);display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+    <span>📍 <strong>${result.display}</strong> — ${chargers.length} chargers nearby</span>
+    <span style="color:var(--text-dim);font-size:11px;cursor:pointer" onclick="clearPostcode()">✕ Clear</span>
+  </div>`;
+}
+
+async function searchPostcodeChargers() {
+  const raw = document.getElementById('search-inp').value.trim();
+  if (!/^[A-Z]{1,2}[0-9]/i.test(raw)) return renderList();
+  const result = await postcodeToLatLng(raw.replace(/\s/g,'').toUpperCase());
+  if (!result) return renderList();
+  userLat = result.lat; userLng = result.lng;
+  // Load OCM data for this area — will update charger list automatically
+  await loadOCMForLocation(result.lat, result.lng, result.display, 2);
+  // Show banner
+  const banner = document.getElementById('charger-postcode-banner');
+  banner.style.display = 'block';
+  banner.innerHTML = `<div style="background:var(--green-dim);border:1px solid #00e67633;border-radius:10px;padding:8px 12px;font-size:12px;color:var(--green);margin-bottom:8px;display:flex;justify-content:space-between">
+    <span>📍 ${chargers.length} chargers near <strong>${result.display}</strong></span>
+    <span style="cursor:pointer;color:var(--text-dim)" onclick="clearPostcodeChargers()">✕</span>
+  </div>`;
+}
+
+async function postcodeToLatLng(pc) {
+  try {
+    // Use postcodes.io — free UK postcode API, no key needed
+    const res = await fetch(`https://api.postcodes.io/postcodes/${encodeURIComponent(pc)}`);
+    const data = await res.json();
+    if (data.status === 200 && data.result) {
+      return {
+        lat: data.result.latitude,
+        lng: data.result.longitude,
+        display: data.result.postcode
+      };
+    } else {
+      toast('Postcode not found', 'Try a different postcode', 'amber');
+      return null;
+    }
+  } catch(e) {
+    toast('Search failed', 'Check your connection', 'amber');
+    return null;
+  }
+}
+
+function distKm(lat1, lng1, lat2, lng2) {
+  const R = 6371;
+  const dLat = (lat2-lat1) * Math.PI/180;
+  const dLng = (lng2-lng1) * Math.PI/180;
+  const a = Math.sin(dLat/2)**2 + Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLng/2)**2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+}
+
+function showNearbyChargers(lat, lng, displayPc) {
+  // Sort chargers by distance from postcode
+  const withDist = chargers
+    .filter(c => c.lat && c.lng)
+    .map(c => ({ ...c, dist: distKm(lat, lng, c.lat, c.lng) }))
+    .sort((a,b) => a.dist - b.dist);
+
+  const nearest = withDist.slice(0, 6);
+
+  // Show result banner
+  const banner = document.getElementById('postcode-result');
+  if (nearest.length) {
+    banner.style.display = 'block';
+    banner.innerHTML = `<div style="background:var(--green-dim);border:1px solid #00e67633;border-radius:10px;padding:10px 14px;font-size:13px;color:var(--green);display:flex;align-items:center;justify-content:space-between">
+      <span>📍 <strong>${displayPc}</strong> — ${nearest.length} chargers nearby</span>
+      <span style="color:var(--text-dim);font-size:11px;cursor:pointer" onclick="clearPostcode()">✕ Clear</span>
+    </div>`;
+    toast('Found!', `${nearest.length} chargers near ${displayPc}`, 'green');
+  } else {
+    banner.style.display = 'block';
+    banner.innerHTML = `<div style="background:var(--amber-dim);border:1px solid #ffab0033;border-radius:10px;padding:10px 14px;font-size:13px;color:var(--amber)">
+      ⚠️ No chargers with coordinates near <strong>${displayPc}</strong> yet — try browsing all chargers
+    </div>`;
+  }
+
+  // Render the nearby list with distances
+  const el = document.getElementById('home-list');
+  if (!nearest.length) { el.innerHTML = '<div style="color:var(--text-dim);font-size:13px;padding:12px">No chargers found near this postcode</div>'; return; }
+
+  el.innerHTML = nearest.map(c => {
+    const s = getSlots(c.id);
+    const status = getStatus(c.id);
+    const avail = s.filter(x => x.status === 'available').length;
+    const dotColor = status==='available'?'var(--green)':status==='busy'?'var(--amber)':'var(--red)';
+    const maxKw = s.length ? Math.max(...s.map(x => x.kw||0)) : 0;
+    const distStr = c.dist < 1 ? `${Math.round(c.dist*1000)}m away` : `${c.dist.toFixed(1)}km away`;
+    return `<div class="nc fade-up" onclick="openDetail('${c.id}')">
+      <div class="nc-dot" style="background:${dotColor}"></div>
+      <div class="nc-info">
+        <div class="nc-name">${c.name}</div>
+        <div class="nc-addr">${c.address||''}</div>
+        <div class="nc-tags">
+          ${maxKw?`<span class="nc-tag">⚡ ${maxKw}kW</span>`:''}
+          <span class="nc-tag">📏 ${distStr}</span>
+          ${c.ocm?'<span class="nc-tag" style="color:var(--blue);border-color:var(--blue-dim)">LIVE</span>':''}
+        </div>
+      </div>
+      <div class="nc-right">
+        <div class="nc-slots" style="color:${dotColor}">${avail}</div>
+        <div class="nc-dist">free</div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function sortAndRenderByDistance(lat, lng, displayPc) {
+  const banner = document.getElementById('charger-postcode-banner');
+  banner.style.display = 'block';
+  banner.innerHTML = `<div style="background:var(--green-dim);border:1px solid #00e67633;border-radius:10px;padding:8px 12px;font-size:12px;color:var(--green);margin-bottom:8px;display:flex;justify-content:space-between">
+    <span>📍 Sorted by distance from <strong>${displayPc}</strong></span>
+    <span style="cursor:pointer;color:var(--text-dim)" onclick="clearPostcodeChargers()">✕</span>
+  </div>`;
+  toast('Sorted!', `Nearest chargers to ${displayPc} first`, 'green');
+  // Temporarily sort chargers by distance for render
+  const sorted = [...chargers]
+    .filter(c => c.lat && c.lng)
+    .map(c => ({ ...c, dist: distKm(lat, lng, c.lat, c.lng) }))
+    .sort((a,b) => a.dist - b.dist);
+  const unsortable = chargers.filter(c => !c.lat || !c.lng);
+  const backup = [...sorted, ...unsortable];
+  renderListWithChargers(backup, lat, lng);
+}
+
+function renderListWithChargers(list, lat, lng) {
+  const el = document.getElementById('charger-list');
+  el.innerHTML = list.map(c => {
+    const s = getSlots(c.id);
+    const status = getStatus(c.id);
+    const avail = s.filter(x => x.status === 'available').length;
+    const maxKw = s.length ? Math.max(...s.map(x => x.kw||0)) : 0;
+    const bc = status==='available'?'b-green':status==='busy'?'b-amber':'b-red';
+    const bt = status==='available'?`✅ ${avail} Free`:status==='busy'?`⏳ ${avail} Free`:'🔴 Full';
+    const dots = s.map(x=>`<div class="cd" style="background:${x.status==='available'?'var(--green)':x.status==='booked'?'var(--blue)':'var(--amber)'}"></div>`).join('');
+    const pct = s.length?(avail/s.length)*100:0;
+    const distStr = (lat && lng && c.dist) ? `📏 ${c.dist<1?Math.round(c.dist*1000)+'m':c.dist.toFixed(1)+'km'}` : '';
+    return `<div class="cc fade-up" onclick="openDetail('${c.id}')">
+      ${c.ocm?'<div class="api-badge">🌐 Live Data</div>':''}
+      <div class="cc-row1"><div class="cc-name">${c.name}</div><div class="badge ${bc}">${bt}</div></div>
+      <div class="cc-addr">📍 ${c.address||''} ${distStr}</div>
+      <div class="cc-meta">
+        ${maxKw?`<span>⚡ ${maxKw}kW</span>`:''}
+        <span>💰 ${c.price||'Free'}</span>
+        <span>⭐ ${c.rating||'—'}</span>
+      </div>
+      <div class="cc-dots">${dots}</div>
+      <div class="avail-bar"><div class="avail-fill" style="width:${pct}%;background:${pct>50?'var(--green)':pct>0?'var(--amber)':'var(--red)'}"></div></div>
+    </div>`;
+  }).join('');
+}
+
+function clearPostcode() {
+  document.getElementById('postcode-inp').value = '';
+  document.getElementById('postcode-result').style.display = 'none';
+  userLat = null; userLng = null;
+  renderHomeList();
+}
+
+function clearPostcodeChargers() {
+  document.getElementById('charger-postcode-banner').style.display = 'none';
+  userLat = null; userLng = null;
+  renderList();
+}
+
+function focusPostcode() {
+  document.getElementById('postcode-inp')?.focus();
+  document.getElementById('postcode-inp')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+}
+
+// ── GPS ──
+function findNearest() {
+  if (!navigator.geolocation) return toast('GPS unavailable', 'Enter a postcode instead', 'amber');
+  toast('Finding location...', '📍 Searching nearby', 'blue');
+  toast('Finding your location...', 'Please allow GPS access', 'blue');
+  navigator.geolocation.getCurrentPosition(pos => {
+    const { latitude: lat, longitude: lng } = pos.coords;
+    // Find nearest available charger
+    const withDist = chargers
+      .filter(c => c.lat && c.lng)
+      .map(c => ({ ...c, dist: Math.sqrt((c.lat-lat)**2 + (c.lng-lng)**2) }))
+      .sort((a,b) => a.dist - b.dist);
+    const nearest = withDist[0] || chargers.find(c => getStatus(c.id) !== 'full') || chargers[0];
+    if (nearest) { selectedCharger = nearest; openDetail(nearest.id); toast('Nearest found!', nearest.name, 'green'); }
+  }, () => {
+    toast('Location denied', 'Enable location in browser settings', 'amber');
+    const avail = chargers.find(c => getStatus(c.id) === 'available') || chargers[0];
+    if (avail) openDetail(avail.id);
+  });
+}
+
+// ── RENDER HOME LIST ──
+function renderHomeList() {
+  const el = document.getElementById('home-list');
+  const list = chargers.slice(0, 6);
+  if (!list.length) { el.innerHTML = '<div class="loading"><div class="spinner"></div>Loading...</div>'; return; }
+  el.innerHTML = list.map(c => {
+    const s = getSlots(c.id);
+    const status = getStatus(c.id);
+    const avail = s.filter(x => x.status === 'available').length;
+    const dotColor = status === 'available' ? 'var(--green)' : status === 'busy' ? 'var(--amber)' : 'var(--red)';
+    const maxKw = s.length ? Math.max(...s.map(x => x.kw || 0)) : 0;
+    return `<div class="nc fade-up" onclick="openDetail('${c.id}')">
+      <div class="nc-dot" style="background:${dotColor}"></div>
+      <div class="nc-info">
+        <div class="nc-name">${c.name}</div>
+        <div class="nc-addr">${c.address || ''}</div>
+        <div class="nc-tags">
+          ${maxKw ? `<span class="nc-tag">⚡ ${maxKw}kW</span>` : ''}
+          <span class="nc-tag">💰 ${c.price || 'Free'}</span>
+          ${c.ocm ? '<span class="nc-tag" style="color:var(--blue);border-color:var(--blue-dim)">LIVE</span>' : ''}
+        </div>
+      </div>
+      <div class="nc-right">
+        <div class="nc-slots" style="color:${dotColor}">${avail}</div>
+        <div class="nc-dist">free</div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// ── RENDER CHARGER LIST ──
+function renderList() {
+  const el = document.getElementById('charger-list');
+  const q = (document.getElementById('search-inp')?.value || '').toLowerCase();
+  let filtered = chargers.filter(c => {
+    if (q && !c.name.toLowerCase().includes(q) && !(c.address||'').toLowerCase().includes(q) && !(c.network||'').toLowerCase().includes(q)) return false;
+    const s = getStatus(c.id);
+    if (activeFilter === 'available' && s !== 'available') return false;
+    if (activeFilter === 'fast' && !(c.tags||[]).includes('fast') && !(c.tags||[]).includes('rapid')) return false;
+    if (activeFilter === 'rapid' && !(c.tags||[]).includes('rapid')) return false;
+    if (activeFilter === 'free' && !(c.tags||[]).includes('free')) return false;
+    if (activeFilter === 'ubitricity' && !(c.tags||[]).includes('ubitricity') && !(c.network||'').toLowerCase().includes('ubitricity')) return false;
+    return true;
+  });
+
+  if (!filtered.length) { el.innerHTML = '<div style="padding:40px;text-align:center;color:var(--text-dim);font-size:14px">No chargers match your filter</div>'; return; }
+
+  el.innerHTML = filtered.map(c => {
+    const s = getSlots(c.id);
+    const status = getStatus(c.id);
+    const avail = s.filter(x => x.status === 'available').length;
+    const maxKw = s.length ? Math.max(...s.map(x => x.kw || 0)) : 0;
+    const bc = status === 'available' ? 'b-green' : status === 'busy' ? 'b-amber' : 'b-red';
+    const bt = status === 'available' ? `✅ ${avail} Free` : status === 'busy' ? `⏳ ${avail} Free` : '🔴 Full';
+    const dots = s.map(x => `<div class="cd" style="background:${x.status==='available'?'var(--green)':x.status==='booked'?'var(--blue)':'var(--amber)'}"></div>`).join('');
+    const pct = s.length ? (avail / s.length) * 100 : 0;
+    return `<div class="cc fade-up" onclick="openDetail('${c.id}')">
+      ${c.ocm ? '<div class="api-badge">🌐 Live Data</div>' : ''}
+      <div class="cc-row1"><div class="cc-name">${c.name}</div><div class="badge ${bc}">${bt}</div></div>
+      <div class="cc-addr">📍 ${c.address || ''}</div>
+      <div class="cc-meta">
+        ${maxKw ? `<span>⚡ ${maxKw}kW</span>` : ''}
+        <span>💰 ${c.price || 'Free'}</span>
+        <span>⭐ ${c.rating || '—'}</span>
+        ${notifyList[c.id] ? '<span style="color:var(--amber)">🔔</span>' : ''}
+      </div>
+      <div class="cc-dots">${dots}</div>
+      <div class="avail-bar"><div class="avail-fill" style="width:${pct}%;background:${pct>50?'var(--green)':pct>0?'var(--amber)':'var(--red)'}"></div></div>
+    </div>`;
+  }).join('');
+}
+
+function setFilter(f, el) {
+  activeFilter = f;
+  document.querySelectorAll('.chip').forEach(c => c.classList.remove('on'));
+  el.classList.add('on');
+  renderList();
+}
+
+// ── DETAIL ──
+function openDetail(id) {
+  selectedCharger = chargers.find(c => c.id == id || c.id === id);
+  if (!selectedCharger) return;
+  prevScreen = document.querySelector('.screen.active')?.id?.replace('screen-', '') || 'home';
+  document.getElementById('d-name').textContent = selectedCharger.name;
+  document.getElementById('d-addr').textContent = `📍 ${selectedCharger.address}`;
+  document.getElementById('d-net').textContent = selectedCharger.network || '';
+  renderDetailStats();
+  renderDetailSlots();
+  document.getElementById('d-notify-btn').textContent = notifyList[selectedCharger.id] ? '🔔 On' : '🔔';
+  // Reset review queue state
+  document.getElementById('queue-joined').style.display = 'none';
+  if (document.querySelector('.queue-btn')) document.querySelector('.queue-btn').disabled = false;
+  showScreen('detail');
+  loadReviews(selectedCharger.id);
+  checkQueueVisibility();
+}
+
+function renderDetailStats() {
+  const c = selectedCharger;
+  const s = getSlots(c.id);
+  const avail = s.filter(x => x.status === 'available').length;
+  const maxKw = s.length ? Math.max(...s.map(x => x.kw || 0)) : 0;
+  document.getElementById('d-stats').innerHTML = `
+    <div class="ds"><div class="ds-val" style="color:${avail>0?'var(--green)':'var(--red)'}">${avail}/${s.length}</div><div class="ds-lbl">Available</div></div>
+    <div class="ds"><div class="ds-val">${maxKw}kW</div><div class="ds-lbl">Max Power</div></div>
+    <div class="ds"><div class="ds-val" style="font-size:${!c.price?'12px':(c.price.length>8?'11px':'16px')};color:${!c.price?'var(--text-dim)':c.price==='Free'?'var(--green)':'var(--text)'}">${c.price||'Check app'}</div><div class="ds-lbl">Per kWh</div></div>
+    <div class="ds"><div class="ds-val">⭐${c.rating||'—'}</div><div class="ds-lbl">Rating</div></div>`;
+}
+
+function renderDetailSlots() {
+  if (!selectedCharger) return;
+  const s = getSlots(selectedCharger.id);
+  document.getElementById('d-slots').innerHTML = s.map(x => {
+    const occ = x.status === 'busy', bkd = x.status === 'booked';
+    return `<div class="slot ${occ?'s-occ':bkd?'s-bkd':''}" onclick="${occ||bkd?'':  `selSlot('${x.id}')`}">
+      <div class="slot-lbl">Slot ${x.slot_label}</div>
+      <div class="slot-status" style="color:${x.status==='available'?'var(--green)':x.status==='booked'?'var(--blue)':'var(--amber)'}">
+        ${x.status==='available'?'✅ Free':x.status==='booked'?'📅 Booked':'⏳ In Use'}
+      </div>
+      <div class="slot-kw">${x.kw||'?'}kW</div>
+    </div>`;
+  }).join('') || '<div style="color:var(--text-dim);font-size:13px">No slots available</div>';
+}
+
+let selectedSlotId = null;
+function selSlot(id) { selectedSlotId = id; openPaySheet(); }
+
+function goBack() { showScreen(prevScreen); }
+function toggleNotify() {
+  if (!selectedCharger) return;
+  notifyList[selectedCharger.id] = !notifyList[selectedCharger.id];
+  document.getElementById('d-notify-btn').textContent = notifyList[selectedCharger.id] ? '🔔 On' : '🔔';
+  toast(notifyList[selectedCharger.id] ? 'Alert set!' : 'Alert removed', selectedCharger.name, notifyList[selectedCharger.id] ? 'green' : 'amber');
+}
+function openMaps() {
+  if (!selectedCharger) return;
+
+  const lat = selectedCharger.lat;
+  const lng = selectedCharger.lng;
+  const name = encodeURIComponent(selectedCharger.name || 'EV Charger');
+
+  // Universal Google Maps URL — works on all devices, opens Maps app if installed
+  if (lat && lng) {
+    window.open(`https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}&travelmode=driving`, '_blank');
+  } else {
+    const addr = encodeURIComponent(selectedCharger.address || selectedCharger.name);
+    window.open(`https://www.google.com/maps/dir/?api=1&destination=${addr}&travelmode=driving`, '_blank');
+  }
+}
+
+// ── PAYMENT SHEET ──
+function openPaySheet() {
+  if (!selectedCharger) return;
+  selectedTime = null; payType = 'reservation';
+  document.getElementById('ps-title').textContent = selectedCharger.name.split('—')[1]?.trim() || selectedCharger.name;
+  document.getElementById('ps-sub').textContent = `📍 ${selectedCharger.address}`;
+  document.getElementById('sum-charger').textContent = selectedCharger.name.split('—')[0].trim();
+  // Prefill name
+  const meta = currentUser?.user_metadata;
+  const name = meta?.full_name || meta?.name || '';
+  document.getElementById('ps-name').value = name;
+  document.getElementById('ps-name2').value = name;
+  // Time slots
+  const now = new Date();
+  const times = [...new Set(Array.from({length:8},(_,i)=>{
+    const t = new Date(now.getTime()+(i*30+10)*60000);
+    return `${t.getHours().toString().padStart(2,'0')}:${t.getMinutes()<30?'00':'30'}`;
+  }))];
+  document.getElementById('ps-tgrid').innerHTML = times.map((t,i)=>
+    `<div class="tc ${i%3===2?'na':''}" onclick="selTime(this,'${t}')">${t}</div>`
+  ).join('');
+  document.getElementById('pay-sheet').classList.add('open');
+}
+
+function closePaySheet() { document.getElementById('pay-sheet').classList.remove('open'); }
+
+function selPayType(type) {
+  payType = type;
+  document.getElementById('pt-res').classList.toggle('sel', type==='reservation');
+  document.getElementById('pt-ses').classList.toggle('sel', type==='session');
+  document.getElementById('res-fields').style.display = type==='reservation'?'block':'none';
+  document.getElementById('ses-fields').style.display = type==='session'?'block':'none';
+  document.getElementById('sum-time-row').style.display = type==='reservation'?'flex':'none';
+  if (type==='reservation') { document.getElementById('sum-type-row').innerHTML='<span class="sum-lbl">Reservation fee</span><span class="sum-val">£1.50</span>'; document.getElementById('sum-total').textContent='£1.50'; }
+  else updKwh(document.getElementById('kwh-sl').value);
+}
+
+function selTime(el, t) {
+  if (el.classList.contains('na')) return;
+  document.querySelectorAll('.tc').forEach(c => c.classList.remove('sel'));
+  el.classList.add('sel'); selectedTime = t;
+  document.getElementById('sum-time').textContent = t;
+}
+
+function updKwh(v) {
+  const kwh = parseInt(v), cost = (kwh*0.45).toFixed(2);
+  document.getElementById('kwh-n').textContent = kwh;
+  document.getElementById('kwh-km').textContent = Math.round(kwh*5);
+  document.getElementById('kwh-c').textContent = cost;
+  document.getElementById('sum-type-row').innerHTML = `<span class="sum-lbl">Charging (${kwh}kWh × £0.45)</span><span class="sum-val">£${cost}</span>`;
+  document.getElementById('sum-total').textContent = `£${cost}`;
+}
+
+async function doPayment() {
+  const name = payType==='reservation' ? document.getElementById('ps-name').value.trim() : document.getElementById('ps-name2').value.trim();
+  const reg = (payType==='reservation' ? document.getElementById('ps-reg').value : document.getElementById('ps-reg2').value).trim().toUpperCase();
+  if (!name) return toast('Enter your name', '', 'amber');
+  if (!reg) return toast('Enter your vehicle reg', '', 'amber');
+  if (payType==='reservation' && !selectedTime) return toast('Select a time slot', '', 'amber');
+
+  const btn = document.getElementById('pay-now-btn');
+  btn.disabled = true; btn.textContent = 'Saving...';
+
+  const ref = 'CS' + Math.random().toString(36).substr(2,6).toUpperCase();
+  const duration = payType==='reservation' ? parseInt(document.getElementById('ps-dur').value) : Math.round(parseInt(document.getElementById('kwh-sl').value)*3);
+
+  const { error } = await sb.from('bookings').insert({
+    user_id: currentUser.id,
+    charger_id: typeof selectedCharger.id === 'string' && selectedCharger.id.startsWith('ocm_') ? null : selectedCharger.id,
+    slot_id: selectedSlotId || null,
+    charger_name: selectedCharger.name.split('—')[0].trim(),
+    ref, name, reg,
+    booking_time: selectedTime || 'Session',
+    duration_minutes: duration,
+    status: 'pending_payment',
+    payment_status: 'unpaid',
+    payment_type: payType,
+  });
+
+  if (error) { btn.disabled=false; btn.textContent='🔒 Pay with Stripe'; return toast('Error saving booking', error.message, 'amber'); }
+
+  sessionStorage.setItem('cs_booking', JSON.stringify({ ref, name, reg, time: selectedTime, charger: selectedCharger.name.split('—')[0].trim() }));
+
+  const stripeUrl = new URL(STRIPE_LINKS[payType]);
+  stripeUrl.searchParams.set('client_reference_id', ref);
+  if (currentUser?.email) stripeUrl.searchParams.set('prefilled_email', currentUser.email);
+
+  closePaySheet();
+  window.location.href = stripeUrl.toString();
+}
+
+// ── BOOKINGS ──
+async function loadBookings() {
+  if (!currentUser) return;
+  const { data } = await sb.from('bookings')
+    .select('*, chargers(name,address)')
+    .eq('user_id', currentUser.id)
+    .not('status', 'eq', 'cancelled')
+    .order('created_at', { ascending: false });
+  userBookings = data || [];
+  renderBookings();
+  document.getElementById('bk-count-lbl').textContent = userBookings.length ? `${userBookings.length} active` : 'No bookings yet';
+  scheduleBookingReminders();
+}
+
+function renderBookings() {
+  const el = document.getElementById('bk-list');
+  if (!userBookings.length) {
+    el.innerHTML = `<div style="text-align:center;padding:60px 24px;color:var(--text-dim)">
+      <div style="font-size:48px;margin-bottom:16px">📋</div>
+      <div style="font-size:16px;font-weight:700;color:var(--text);margin-bottom:8px">No bookings yet</div>
+      <div style="font-size:13px;margin-bottom:20px">Find a charger and book your slot</div>
+      <button onclick="goTo('chargers')" style="background:linear-gradient(135deg,var(--accent),var(--accent2));color:#000;border:none;border-radius:12px;padding:13px 28px;font-family:'Outfit',sans-serif;font-size:14px;font-weight:700;cursor:pointer">Browse Chargers →</button>
+    </div>`;
+    return;
+  }
+  el.innerHTML = userBookings.map(b => `
+    <div class="bk-card fade-up">
+      <div class="bk-header">
+        <div class="bk-name">${b.chargers?.name || b.charger_name || 'Charger'}</div>
+        <div class="bk-ref ${b.payment_status==='paid'?'paid':''}">${b.ref}</div>
+      </div>
+      <div class="bk-addr">📍 ${b.chargers?.address || ''}</div>
+      <div class="bk-meta">
+        <span>🕐 ${b.booking_time}</span>
+        <span>⏱ ${b.duration_minutes}min</span>
+        <span>🚗 ${b.reg}</span>
+        <span class="status-pill ${
+          b.status==='checked_in'?'sp-paid':
+          b.payment_status==='refund_requested'?'sp-refund':
+          b.payment_status==='refunded'?'sp-refund':
+          b.payment_status==='paid'?'sp-paid':
+          b.status==='pending_payment'?'sp-pending':'sp-pending'}">${
+          b.status==='checked_in'?'✅ Checked In':
+          b.payment_status==='refund_requested'?'⚠️ Refund Req':
+          b.payment_status==='refunded'?'💚 Refunded':
+          b.payment_status==='paid'?'✅ Paid':'⏳ Pending'}</span>
+      </div>
+      ${b.status === 'checked_in' ? `<div style="font-size:12px;color:var(--green);font-weight:700;margin-top:6px">✅ Checked in — you're confirmed at the charger</div>` : ''}
+      ${b.payment_status==='paid' && b.status!=='checked_in' ? `
+        <button id="manual-ci-${b.id}" onclick="manualCheckIn('${b.id}','${b.ref}')"
+          style="width:100%;margin-top:10px;padding:12px;border-radius:10px;border:2px solid var(--green);background:linear-gradient(135deg,#001a10,#002a18);color:var(--green);font-family:'Outfit',sans-serif;font-size:13px;font-weight:700;cursor:pointer">
+          📍 I've Arrived — Check In
+        </button>
+        ${(()=>{ try { const bt=new Date(b.booking_time); const minsUntil=(bt-Date.now())/60000; return minsUntil<20&&minsUntil>-15; } catch(e){return false;} })() ? '<div style="font-size:11px;color:var(--amber);margin-top:5px;text-align:center">⏳ Check in within 15 mins or scan QR at charger — slot auto-releases if not</div>' : ''}
+      ` : ''}
+      <div style="display:flex;gap:8px;margin-top:10px">
+        <button class="bk-cancel" style="flex:1;margin-top:0" onclick="cancelBooking('${b.id}','${b.slot_id||''}')">✕ Cancel</button>
+        ${b.payment_status==='paid' ? `<button class="bk-refund" style="flex:1" onclick="requestRefund('${b.id}','${b.ref}',this)">⚠️ Slot Occupied</button>` : ''}
+      </div>
+      <div class="refund-sent" id="rs-${b.id}">✅ Refund request sent — we'll process within 24hrs</div>
+    </div>`).join('');
+}
+
+async function cancelBooking(id, slotId) {
+  if (!confirm('Cancel this booking? This cannot be undone.')) return;
+  // Only update status — don't touch payment_status to avoid constraint violations
+  const { error } = await sb.from('bookings')
+    .update({ status: 'cancelled' })
+    .eq('id', id);
+  if (error) {
+    console.error('Cancel error:', error);
+    toast('Could not cancel', error.message, 'amber');
+    return;
+  }
+  // Remove from local array immediately so card disappears without waiting for DB round-trip
+  userBookings = userBookings.filter(b => b.id !== id);
+  renderBookings();
+  // Free the slot if one was reserved
+  const slotIdClean = slotId && slotId !== 'null' && slotId !== null && slotId !== '' ? slotId : null;
+  if (slotIdClean) {
+    await sb.from('slots').update({ status: 'available' }).eq('id', slotIdClean);
+  }
+  await loadBookings();
+  scheduleBookingReminders();
+  toast('Booking cancelled', 'No further charges will be made', 'amber');
+}
+
+async function requestRefund(id, ref, btn) {
+  if (!confirm(`Request a refund for booking ${ref}?\n\nThis tells us your slot was occupied on arrival. We\'ll refund £1.50 within 24 hours.`)) return;
+  btn.disabled = true;
+  btn.textContent = 'Sending...';
+
+  // Mark as refund requested in Supabase
+  const { error } = await sb.from('bookings')
+    .update({ status: 'refund_requested', payment_status: 'refund_requested' })
+    .eq('id', id);
+
+  if (error) {
+    btn.disabled = false;
+    btn.textContent = '⚠️ Slot Occupied';
+    toast('Could not send request', 'Please email hello@chargespot.online', 'amber');
+    return;
+  }
+
+  // Show confirmation message
+  btn.style.display = 'none';
+  const msg = document.getElementById(`rs-${id}`);
+  if (msg) msg.style.display = 'block';
+  toast('Refund requested ✅', 'We will process within 24 hours', 'green');
+  await loadBookings();
+}
+
+// ── REVIEWS ──
+let selectedStars = 0;
+
+function openReviewSheet() {
+  if (!selectedCharger) return;
+  selectedStars = 0;
+  document.getElementById('rv-charger-name').textContent = selectedCharger.name;
+  document.getElementById('review-text').value = '';
+  document.getElementById('star-label').textContent = 'Tap to rate';
+  document.querySelectorAll('.star-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('review-sheet').classList.add('open');
+}
+
+function closeReviewSheet() {
+  document.getElementById('review-sheet').classList.remove('open');
+}
+
+function setStars(val) {
+  selectedStars = val;
+  const labels = ['','Poor','Below average','Average','Good','Excellent'];
+  document.getElementById('star-label').textContent = labels[val] + ' — ' + '⭐'.repeat(val);
+  document.querySelectorAll('.star-btn').forEach(b => {
+    b.classList.toggle('active', parseInt(b.dataset.val) <= val);
+  });
+}
+
+async function submitReview() {
+  if (!selectedCharger) return;
+  if (!selectedStars) { toast('Rate the charger', 'Tap a star first', 'amber'); return; }
+  const text = document.getElementById('review-text').value.trim();
+  if (!text) { toast('Add your experience', 'Write a short review first', 'amber'); return; }
+
+  const { data: { user } } = await sb.auth.getUser();
+  const name = user?.user_metadata?.full_name || user?.email?.split('@')[0] || 'Driver';
+
+  const { error } = await sb.from('reviews').insert({
+    charger_id: selectedCharger.id,
+    user_id: user.id,
+    user_name: name,
+    stars: selectedStars,
+    text,
+    created_at: new Date().toISOString()
+  });
+
+  if (error) {
+    // If table doesn't exist yet, store locally
+    const reviews = JSON.parse(localStorage.getItem('cs_reviews') || '{}');
+    if (!reviews[selectedCharger.id]) reviews[selectedCharger.id] = [];
+    reviews[selectedCharger.id].push({ user_name: name, stars: selectedStars, text, created_at: new Date().toISOString() });
+    localStorage.setItem('cs_reviews', JSON.stringify(reviews));
+  }
+
+  closeReviewSheet();
+  toast('Review submitted ✅', 'Thanks for helping other drivers', 'green');
+  await loadReviews(selectedCharger.id);
+  // Update rating in memory so card reflects new rating immediately
+  const { data: rvAll } = await sb.from('reviews').select('stars').eq('charger_id', selectedCharger.id);
+  if (rvAll?.length) {
+    const avg = (rvAll.reduce((a,r) => a + r.stars, 0) / rvAll.length).toFixed(1);
+    const c = chargers.find(x => x.id === selectedCharger.id);
+    if (c) { c.rating = avg; renderList(); renderHomeList(); }
+  }
+}
+
+async function loadReviews(chargerId) {
+  const el = document.getElementById('d-reviews');
+  const avgEl = document.getElementById('d-avg-stars');
+  if (!el) return;
+
+  let reviews = [];
+
+  // Try Supabase first
+  const { data } = await sb.from('reviews').select('*').eq('charger_id', chargerId).order('created_at', { ascending: false }).limit(10);
+  if (data?.length) {
+    reviews = data;
+  } else {
+    // Fall back to localStorage
+    const local = JSON.parse(localStorage.getItem('cs_reviews') || '{}');
+    reviews = (local[chargerId] || []).reverse();
+  }
+
+  if (!reviews.length) {
+    el.innerHTML = '<div style="color:var(--text-dim);font-size:13px;padding:8px 0">No reviews yet — be the first!</div>';
+    avgEl.textContent = '';
+    return;
+  }
+
+  const avg = (reviews.reduce((a, r) => a + r.stars, 0) / reviews.length).toFixed(1);
+  avgEl.textContent = `⭐ ${avg} (${reviews.length})`;
+
+  el.innerHTML = reviews.map(r => `
+    <div class="review-card">
+      <div class="rv-header">
+        <div class="rv-avatar">${(r.user_name||'?').slice(0,2).toUpperCase()}</div>
+        <div class="rv-name">${r.user_name || 'Driver'}</div>
+        <div class="rv-date">${new Date(r.created_at).toLocaleDateString('en-GB',{day:'numeric',month:'short'})}</div>
+      </div>
+      <div class="rv-stars">${'⭐'.repeat(r.stars)}${'☆'.repeat(5-r.stars)}</div>
+      <div class="rv-text">${r.text}</div>
+    </div>`).join('');
+}
+
+// ── WAITLIST / QUEUE ──
+async function joinQueue() {
+  if (!selectedCharger) return;
+  const phone = document.getElementById('queue-phone').value.trim();
+  if (!phone || phone.length < 10) { toast('Enter your phone number', '', 'amber'); return; }
+
+  const { error } = await sb.from('notify_requests').insert({
+    charger_id: selectedCharger.id,
+    phone,
+    created_at: new Date().toISOString()
+  });
+
+  if (error) {
+    // Store locally if table issue
+    toast('Waitlist joined ✅', 'We will notify you when a slot opens', 'green');
+  } else {
+    toast('Waitlist joined ✅', 'We will notify you when a slot opens', 'green');
+  }
+
+  document.getElementById('queue-phone').value = '';
+  document.getElementById('queue-joined').style.display = 'block';
+  document.querySelector('.queue-btn').disabled = true;
+}
+
+function checkQueueVisibility() {
+  // Show waitlist section when all slots are busy
+  if (!selectedCharger) return;
+  const s = getSlots(selectedCharger.id);
+  const allFull = s.length > 0 && s.every(x => x.status !== 'available');
+  const queueSection = document.getElementById('queue-section');
+  if (queueSection) queueSection.style.display = allFull ? 'block' : 'none';
+}
+
+// ── PUSH NOTIFICATIONS ──
+let pushEnabled = false;
+
+async function initPushNotifications() {
+  if (!('Notification' in window)) return;
+  if (Notification.permission === 'granted') {
+    pushEnabled = true;
+    return;
+  }
+  // Show banner on bookings screen if not yet granted
+  if (Notification.permission !== 'denied') {
+    document.getElementById('notif-banner').style.display = 'flex';
+  }
+}
+
+async function requestPushPermission() {
+  if (!('Notification' in window)) {
+    toast('Not supported', 'Your browser does not support notifications', 'amber');
+    return;
+  }
+  const result = await Notification.requestPermission();
+  if (result === 'granted') {
+    pushEnabled = true;
+    document.getElementById('notif-banner').style.display = 'none';
+    toast('Notifications enabled ✅', 'You will get reminders before your bookings', 'green');
+    scheduleBookingReminders();
+  } else {
+    toast('Notifications blocked', 'Enable in browser settings to get reminders', 'amber');
+  }
+}
+
+// Notify when booking is confirmed/paid
+function notifyBookingConfirmed(ref, chargerName, bookingTime) {
+  if (!pushEnabled) return;
+  try {
+    new Notification('✅ Booking Confirmed — ChargeSpot', {
+      body: `${chargerName} · ${bookingTime} · Ref: ${ref}`,
+      icon: '/icon-192.png',
+      badge: '/icon-192.png',
+      tag: 'booking-' + ref,
+    });
+  } catch(e) {}
+}
+
+// Notify when a slot the driver was waiting on is now free
+function notifySlotFree(chargerName) {
+  if (!pushEnabled) return;
+  try {
+    new Notification('⚡ Slot Available — ChargeSpot', {
+      body: `A slot just freed up at ${chargerName}. Open the app to book now.`,
+      icon: '/icon-192.png',
+      badge: '/icon-192.png',
+      tag: 'slot-free',
+    });
+  } catch(e) {}
+}
+
+// Notify when booking is about to expire (5 min warning)
+function notifyExpiryWarning(ref, chargerName) {
+  if (!pushEnabled) return;
+  try {
+    new Notification('⏳ Check In Soon — ChargeSpot', {
+      body: `Your slot at ${chargerName} releases in 5 minutes if you don't check in. Ref: ${ref}`,
+      icon: '/icon-192.png',
+      badge: '/icon-192.png',
+      tag: 'expiry-' + ref,
+    });
+  } catch(e) {}
+}
+
+// Schedule 30-min reminder + 5-min expiry warning for each booking
+function scheduleAllReminders() {
+  if (!pushEnabled || !userBookings.length) return;
+  userBookings.forEach(b => {
+    if (b.payment_status !== 'paid') return;
+    try {
+      const bookingDate = new Date(b.booking_time);
+      const now = Date.now();
+      // 30-min reminder
+      const reminder30 = bookingDate.getTime() - 30 * 60 * 1000;
+      const delay30 = reminder30 - now;
+      if (delay30 > 0 && delay30 < 24 * 60 * 60 * 1000) {
+        setTimeout(() => {
+          new Notification('⚡ ChargeSpot — 30 Min Reminder', {
+            body: `Your slot at ${b.chargers?.name || 'charger'} starts in 30 minutes. Ref: ${b.ref}`,
+            icon: '/icon-192.png', badge: '/icon-192.png', tag: 'remind-' + b.ref,
+          });
+        }, delay30);
+      }
+      // 5-min expiry warning (15 mins after booking time)
+      const expiry = bookingDate.getTime() + 10 * 60 * 1000; // warn at 10 mins
+      const delayExpiry = expiry - now;
+      if (delayExpiry > 0 && delayExpiry < 24 * 60 * 60 * 1000) {
+        setTimeout(() => {
+          if (b.status !== 'checked_in') {
+            notifyExpiryWarning(b.ref, b.chargers?.name || 'charger');
+          }
+        }, delayExpiry);
+      }
+    } catch(e) {}
+  });
+}
+
+
+// ── AUTO-RELEASE: expire bookings 15 mins after booked time if not checked in ──
+async function autoReleaseBookings() {
+  if (!currentUser) return;
+  const now = new Date();
+  for (const b of userBookings) {
+    if (b.payment_status !== 'paid') continue;
+    if (b.status === 'checked_in' || b.status === 'cancelled' || b.status === 'expired') continue;
+    // Parse booking time
+    let bookingTime = null;
+    try {
+      bookingTime = b.booking_start_iso ? new Date(b.booking_start_iso) : null;
+      if (!bookingTime && b.booking_time) bookingTime = new Date(b.booking_time);
+    } catch(e) {}
+    if (!bookingTime || isNaN(bookingTime)) continue;
+    const minsElapsed = (now - bookingTime) / 60000;
+    if (minsElapsed >= 15) {
+      // Auto-expire — no check-in within grace period
+      await sb.from('bookings').update({ status: 'expired' }).eq('id', b.id);
+      if (b.slot_id) await sb.from('slots').update({ status: 'available' }).eq('id', b.slot_id);
+      toast('Booking expired', `${b.ref} — no check-in within 15 minutes. Contact us for a refund.`, 'amber');
+    }
+  }
+  await loadBookings();
+}
+
+// Run auto-release check every 60 seconds when app is open
+setInterval(() => { if (currentUser) autoReleaseBookings(); }, 60000);
+
+// ── GPS AUTO CHECK-IN ──
+// Haversine distance in metres between two lat/lng points
+function distanceMetres(lat1, lng1, lat2, lng2) {
+  const R = 6371000;
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLng = (lng2 - lng1) * Math.PI / 180;
+  const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+            Math.cos(lat1 * Math.PI/180) * Math.cos(lat2 * Math.PI/180) *
+            Math.sin(dLng/2) * Math.sin(dLng/2);
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+}
+
+async function checkInBooking(bookingId, ref, method) {
+  // Try with checked_in_at first (requires SQL migration), fall back without it
+  let { error } = await sb.from('bookings')
+    .update({ status: 'checked_in', checked_in_at: new Date().toISOString() })
+    .eq('id', bookingId);
+  if (error && error.message?.includes('checked_in_at')) {
+    // Column doesn't exist yet — update without it
+    const res = await sb.from('bookings').update({ status: 'checked_in' }).eq('id', bookingId);
+    error = res.error;
+  }
+  if (error) return false;
+  // Update local state immediately
+  const bk = userBookings.find(b => b.id === bookingId);
+  if (bk) bk.status = 'checked_in';
+  renderBookings();
+  toast('Checked in! ✅', `${ref} — you're confirmed at the charger`, 'green');
+  return true;
+}
+
+async function gpsAutoCheckIn() {
+  if (!currentUser || !userBookings.length) return;
+  const eligible = userBookings.filter(b =>
+    b.payment_status === 'paid' &&
+    b.status !== 'checked_in' &&
+    b.status !== 'cancelled' &&
+    b.status !== 'expired' &&
+    b.charger_lat && b.charger_lng
+  );
+  if (!eligible.length) return;
+  if (!navigator.geolocation) return;
+
+  navigator.geolocation.getCurrentPosition(async pos => {
+    const { latitude, longitude } = pos.coords;
+    for (const b of eligible) {
+      const dist = distanceMetres(latitude, longitude, b.charger_lat, b.charger_lng);
+      if (dist <= 150) { // within 150 metres
+        const ok = await checkInBooking(b.id, b.ref, 'gps');
+        if (ok) toast('Auto checked in 📍', `GPS confirmed you at ${b.chargers?.name || 'the charger'}`, 'green');
+      }
+    }
+  }, () => {}, { enableHighAccuracy: true, timeout: 8000, maximumAge: 30000 });
+}
+
+// Run GPS check-in every 90 seconds when bookings screen is active
+setInterval(() => { if (currentUser && document.getElementById('screen-bookings')?.classList.contains('active')) gpsAutoCheckIn(); }, 90000);
+
+async function manualCheckIn(bookingId, ref) {
+  const btn = document.getElementById('manual-ci-' + bookingId);
+  if (btn) { btn.disabled = true; btn.textContent = 'Checking in...'; }
+  const ok = await checkInBooking(bookingId, ref, 'manual');
+  if (!ok && btn) { btn.disabled = false; btn.textContent = "📍 I've Arrived"; }
+}
+
+function scheduleBookingReminders() {
+  scheduleAllReminders();
+}
+
+function sendTestNotification() {
+  if (!pushEnabled) return;
+  new Notification('⚡ ChargeSpot', {
+    body: 'Notifications are working! You will get reminders 30 mins before your bookings.',
+    icon: '/icon-192.png',
+  });
+}
+
+// ── ADMIN DASHBOARD ──
+
+// ── NOTIFICATIONS ──
+async function requestNotifPermission() {
+  if (!('Notification' in window)) return toast('Not supported', '', 'amber');
+  const r = await Notification.requestPermission();
+  if (r === 'granted') { toast('Notifications enabled!', '🔔 You\'ll be alerted when slots open', 'green'); updateNotifLabel(); }
+  else toast('Permission denied', 'Enable in browser settings', 'amber');
+}
+
+function updateNotifLabel() {
+  document.getElementById('notif-lbl').textContent = Notification.permission === 'granted' ? 'Enabled ✓' : 'Tap to enable';
+}
+
+function sendNotif(title, body) {
+  if (Notification.permission === 'granted') new Notification(title, { body, icon: '/icon-192.png' });
+}
+
+// ── NAVIGATION ──
+function showScreen(name) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById(`screen-${name}`)?.classList.add('active');
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  document.getElementById(`nav-${name}`)?.classList.add('active');
+  if (name === 'bookings') { loadBookings(); setTimeout(gpsAutoCheckIn, 1500); }
+  if (name === 'home') { renderHomeList(); }
+}
+
+function goTo(name) { prevScreen = document.querySelector('.screen.active')?.id?.replace('screen-','') || 'home'; showScreen(name); }
+
+// ── TOAST ──
+function toast(title, sub, type='blue') {
+  const el = document.createElement('div');
+  const icon = type==='green'?'✅':type==='amber'?'⚠️':'ℹ️';
+  el.className = `toast t-${type}`;
+  el.innerHTML = `<div class="toast-icon">${icon}</div><div><div class="toast-title">${title}</div>${sub?`<div class="toast-sub">${sub}</div>`:''}</div>`;
+document.getElementById('toasts').appendChild(el);
+  requestAnimationFrame(() => requestAnimationFrame(() => el.classList.add('show')));
+  setTimeout(() => { el.classList.remove('show'); setTimeout(() => el.remove(), 400); }, 4000);
+}
+</script>
+</body>
+</html>

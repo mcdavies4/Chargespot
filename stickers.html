@@ -1,0 +1,619 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ChargeSpot — QR Sticker Generator</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#06090d;--surface:#0c1018;--surface2:#111820;--border:#1a2535;--border2:#1f2e42;
+  --green:#00ff87;--green-dim:#00ff8710;--amber:#ffb800;--amber-dim:#ffb80010;
+  --blue:#00c8ff;--blue-dim:#00c8ff10;--red:#ff4560;
+  --text:#dce8f5;--text-dim:#4a5f78;--text-mid:#7a90a8;
+  --accent:#00c8ff;--accent2:#0066ff;
+}
+body{background:var(--bg);color:var(--text);font-family:'Syne',sans-serif;min-height:100vh;padding:24px 16px 60px}
+.page{max-width:960px;margin:0 auto}
+h1{font-size:24px;font-weight:800;margin-bottom:4px}
+h1 span{color:var(--accent)}
+.sub{font-size:13px;color:var(--text-dim);margin-bottom:24px}
+
+/* TABS */
+.tabs{display:flex;gap:4px;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:4px;margin-bottom:20px}
+.tab{flex:1;padding:10px;border-radius:8px;border:none;font-family:'Syne',sans-serif;font-size:13px;font-weight:700;cursor:pointer;background:transparent;color:var(--text-dim);transition:all .2s}
+.tab.active{background:linear-gradient(135deg,var(--accent),var(--accent2));color:#000}
+
+/* STATUS */
+.status{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:10px 14px;margin-bottom:16px;font-size:13px;color:var(--text-dim);display:flex;align-items:center;gap:8px}
+.sdot{width:8px;height:8px;border-radius:50%;background:var(--amber);flex-shrink:0;animation:blink 1.5s infinite}
+.sdot.ok{background:var(--green);animation:none}
+.sdot.loading{background:var(--accent);animation:blink .8s infinite}
+
+/* SEARCH PANEL */
+.search-panel{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:20px;margin-bottom:16px}
+.search-row{display:flex;gap:8px;margin-bottom:16px}
+.search-inp{flex:1;background:var(--surface2);border:1px solid var(--border2);border-radius:10px;padding:11px 14px;font-family:'Syne',sans-serif;font-size:14px;color:var(--text);outline:none}
+.search-inp:focus{border-color:var(--accent)}
+.search-inp::placeholder{color:var(--text-dim)}
+.search-btn{padding:11px 18px;border-radius:10px;border:none;background:linear-gradient(135deg,var(--accent),var(--accent2));color:#000;font-family:'Syne',sans-serif;font-size:13px;font-weight:700;cursor:pointer;white-space:nowrap}
+.search-btn:disabled{opacity:.5;cursor:not-allowed}
+
+/* RESULTS LIST */
+.results-list{display:flex;flex-direction:column;gap:8px;max-height:400px;overflow-y:auto}
+.result-item{background:var(--surface2);border:1px solid var(--border2);border-radius:12px;padding:12px 14px;display:flex;align-items:center;gap:12px;cursor:pointer;transition:all .2s}
+.result-item:hover{border-color:var(--accent);background:#0e1a2e}
+.result-item.deployed{border-color:#00ff8733;background:var(--green-dim)}
+.ri-info{flex:1;min-width:0}
+.ri-name{font-size:13px;font-weight:700;color:var(--text);margin-bottom:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ri-addr{font-size:11px;color:var(--text-dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ri-badge{font-size:10px;font-weight:700;padding:3px 8px;border-radius:20px;white-space:nowrap;flex-shrink:0}
+.rb-add{background:var(--blue-dim);color:var(--accent);border:1px solid #00c8ff22}
+.rb-deployed{background:var(--green-dim);color:var(--green);border:1px solid #00ff8722}
+.empty-results{text-align:center;padding:40px;color:var(--text-dim);font-size:13px}
+
+/* DEPLOYED LIST */
+.deployed-panel{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:20px;margin-bottom:16px}
+.dp-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}
+.dp-title{font-size:12px;font-weight:700;color:var(--text-dim);letter-spacing:1.5px;text-transform:uppercase}
+.dp-count{font-size:12px;color:var(--text-mid)}
+.deployed-empty{text-align:center;padding:32px;color:var(--text-dim);font-size:13px;border:1px dashed var(--border2);border-radius:10px}
+.dep-item{background:var(--surface2);border:1px solid #00ff8722;border-radius:12px;padding:12px 14px;display:flex;align-items:center;gap:10px;margin-bottom:8px}
+.dep-info{flex:1;min-width:0}
+.dep-name{font-size:13px;font-weight:700;color:var(--text);margin-bottom:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.dep-addr{font-size:11px;color:var(--text-dim)}
+.dep-remove{background:transparent;border:none;color:var(--text-dim);cursor:pointer;font-size:16px;padding:4px;flex-shrink:0;transition:color .2s}
+.dep-remove:hover{color:var(--red)}
+.dep-date{font-size:10px;color:var(--text-dim);font-family:'JetBrains Mono',monospace;white-space:nowrap;flex-shrink:0}
+
+/* GENERATE CONTROLS */
+.gen-controls{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:20px;margin-bottom:16px}
+.ctrl-row{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px}
+.ctrl-label{display:block;font-size:11px;font-weight:700;color:var(--text-dim);letter-spacing:1px;text-transform:uppercase;margin-bottom:5px}
+select{width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:11px 13px;font-family:'Syne',sans-serif;font-size:14px;color:var(--text);outline:none}
+select:focus{border-color:var(--accent)}
+select option{background:var(--surface2)}
+.gen-btn{width:100%;padding:13px;border-radius:12px;border:none;font-family:'Syne',sans-serif;font-size:15px;font-weight:700;cursor:pointer;background:linear-gradient(135deg,var(--accent),var(--accent2));color:#000;transition:all .2s}
+.gen-btn:disabled{opacity:.5;cursor:not-allowed}
+
+/* STICKER GRID */
+.stickers-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:16px;margin-bottom:24px}
+
+/* STICKER DESIGN */
+.sticker{background:#fff;border-radius:14px;overflow:hidden;box-shadow:0 6px 24px rgba(0,0,0,.5)}
+.s-top{background:linear-gradient(135deg,#080c10,#0e1a2e);padding:12px 14px;position:relative}
+.s-top::after{content:'⚡';position:absolute;right:10px;top:6px;font-size:24px;opacity:.15}
+.s-logo{font-size:14px;font-weight:800;color:#fff}
+.s-logo em{color:#00c8ff;font-style:normal}
+.s-tag{font-size:8px;font-weight:600;color:#4a7a9b;letter-spacing:2px;text-transform:uppercase;margin-top:2px}
+.s-body{padding:12px 14px;text-align:center}
+.s-qr{display:flex;justify-content:center;margin-bottom:10px}
+.s-qr>div{border-radius:6px;overflow:hidden;border:3px solid #e8f0f8}
+.s-name{font-size:11px;font-weight:800;color:#1a2535;margin-bottom:2px;line-height:1.3}
+.s-addr{font-size:9px;color:#6a7a8a;margin-bottom:8px}
+.s-inst{background:#f0f7ff;border-radius:6px;padding:7px;font-size:9px;color:#1a3a5a;line-height:1.5}
+.s-inst strong{color:#0055cc;display:block;margin-bottom:1px;font-size:10px}
+.s-bot{background:#080c10;padding:6px 12px;display:flex;justify-content:space-between;align-items:center}
+.s-url{font-family:'JetBrains Mono',monospace;font-size:7px;color:#4a7a9b}
+.s-id{font-family:'JetBrains Mono',monospace;font-size:7px;color:#00c8ff;font-weight:600}
+
+/* PRINT */
+.print-wrap{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:18px;text-align:center;margin-bottom:20px;display:none}
+.print-wrap.show{display:block}
+.btns{display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin-top:14px}
+.btn{padding:11px 22px;border-radius:10px;border:none;font-family:'Syne',sans-serif;font-size:13px;font-weight:700;cursor:pointer}
+.btn-p{background:linear-gradient(135deg,var(--accent),var(--accent2));color:#000}
+.btn-s{background:var(--surface2);color:var(--text);border:1px solid var(--border)}
+
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.3}}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+@media print{
+  body{background:#fff;padding:4px}
+  .tabs,.search-panel,.deployed-panel,.gen-controls,.print-wrap,.sub,h1,.status{display:none!important}
+  .stickers-grid{grid-template-columns:repeat(2,1fr);gap:8px}
+  .sticker{box-shadow:none;border:1px solid #ccc;break-inside:avoid}
+}
+</style>
+<!-- Google tag (gtag.js) -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-WW3QC0ST8H"></script>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+  gtag('config', 'G-WW3QC0ST8H');
+</script>
+</head>
+<body>
+<div class="page">
+  <h1>QR Sticker <span>Generator</span></h1>
+  <div class="sub">Search for chargers you've physically visited → add to your deployed list → generate and print stickers.</div>
+
+  <div class="status" id="status-bar">
+    <div class="sdot ok" id="sdot"></div>
+    <span id="stxt">Ready — search for chargers or view your deployed list</span>
+  </div>
+
+  <!-- TABS -->
+  <div class="tabs">
+    <button class="tab active" id="tab-search" onclick="switchTab('search')">🔍 Find Chargers</button>
+    <button class="tab" id="tab-deployed" onclick="switchTab('deployed')">📍 Deployed (<span id="dep-count">0</span>)</button>
+    <button class="tab" id="tab-print" onclick="switchTab('print')">🖨️ Print Stickers</button>
+  </div>
+
+  <!-- SEARCH TAB -->
+  <div id="panel-search">
+    <div class="search-panel">
+      <div style="font-size:12px;font-weight:700;color:var(--text-dim);letter-spacing:1px;text-transform:uppercase;margin-bottom:12px">Find Chargers Near You</div>
+
+      <!-- GPS + Postcode row -->
+      <div class="search-row">
+        <button class="search-btn" style="background:var(--surface2);border:1px solid var(--border2);color:var(--accent);flex-shrink:0;display:flex;align-items:center;gap:6px" onclick="loadByGPS()" id="gps-btn">
+          🎯 Use My Location
+        </button>
+        <input class="search-inp" id="search-inp" placeholder="Or enter postcode e.g. E1, SW1A, EC1V 9LT..." onkeydown="if(event.key==='Enter')searchChargers()">
+        <button class="search-btn" id="search-btn" onclick="searchChargers()">Search</button>
+      </div>
+
+      <!-- Radius slider -->
+      <div style="margin-bottom:14px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+          <span style="font-size:11px;font-weight:700;color:var(--text-dim);text-transform:uppercase;letter-spacing:.5px">Search Radius</span>
+          <span style="font-size:12px;font-weight:700;color:var(--accent)" id="radius-label">1 km</span>
+        </div>
+        <input type="range" id="radius-slider" min="0.5" max="5" step="0.5" value="1"
+          style="width:100%;accent-color:var(--accent)"
+          oninput="document.getElementById('radius-label').textContent=this.value+'km'">
+        <div style="display:flex;justify-content:space-between;font-size:10px;color:var(--text-dim);margin-top:2px">
+          <span>0.5km</span><span>Walking distance</span><span>5km</span>
+        </div>
+      </div>
+
+      <!-- Sort + filter row -->
+      <div style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap">
+        <select id="sort-sel" style="background:var(--surface2);border:1px solid var(--border2);border-radius:8px;padding:7px 10px;font-family:'Syne',sans-serif;font-size:12px;color:var(--text);outline:none;flex:1">
+          <option value="distance">Sort by Distance</option>
+          <option value="name">Sort by Name</option>
+          <option value="network">Sort by Network</option>
+        </select>
+        <select id="network-filter" style="background:var(--surface2);border:1px solid var(--border2);border-radius:8px;padding:7px 10px;font-family:'Syne',sans-serif;font-size:12px;color:var(--text);outline:none;flex:1">
+          <option value="">All Networks</option>
+          <option value="ubitricity">Ubitricity</option>
+          <option value="bp pulse">BP Pulse</option>
+          <option value="pod point">Pod Point</option>
+          <option value="osprey">Osprey</option>
+        </select>
+      </div>
+
+      <div class="results-list" id="results-list">
+        <div class="empty-results">
+          <div style="font-size:40px;margin-bottom:12px">🎯</div>
+          <div style="font-weight:700;color:var(--text);margin-bottom:6px">Load chargers near you</div>
+          <div style="font-size:12px">Tap "Use My Location" for instant results<br>or enter a postcode to search any area</div>
+          <button onclick="loadByGPS()" style="margin-top:14px;padding:10px 20px;border-radius:10px;border:none;background:linear-gradient(135deg,var(--accent),var(--accent2));color:#000;font-family:'Syne',sans-serif;font-size:13px;font-weight:700;cursor:pointer">
+            🎯 Use My Location
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- DEPLOYED TAB -->
+  <div id="panel-deployed" style="display:none">
+    <div class="deployed-panel">
+      <div class="dp-header">
+        <div class="dp-title">Your Deployed Chargers</div>
+        <div class="dp-count" id="dep-count-label">0 chargers</div>
+      </div>
+      <div id="deployed-list">
+        <div class="deployed-empty">
+          <div style="font-size:32px;margin-bottom:8px">📍</div>
+          No deployed chargers yet<br>
+          <span style="font-size:12px">Search for chargers and add the ones you've physically put stickers on</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- PRINT TAB -->
+  <div id="panel-print" style="display:none">
+    <div class="gen-controls">
+      <div class="ctrl-row">
+        <div>
+          <label class="ctrl-label">Generate stickers for</label>
+          <select id="sel-charger">
+            <option value="all">All Deployed Chargers</option>
+          </select>
+        </div>
+        <div>
+          <label class="ctrl-label">QR Size</label>
+          <select id="sel-size">
+            <option value="120">Small</option>
+            <option value="150" selected>Medium</option>
+            <option value="180">Large</option>
+          </select>
+        </div>
+      </div>
+      <button class="gen-btn" id="gen-btn" onclick="generateStickers()">⚡ Generate Stickers</button>
+    </div>
+    <div class="stickers-grid" id="stickers-grid">
+      <div style="grid-column:1/-1;text-align:center;padding:40px;color:var(--text-dim);font-size:13px">
+        Add chargers to your deployed list first, then generate stickers here
+      </div>
+    </div>
+    <div class="print-wrap" id="print-wrap">
+      <div style="font-size:14px;font-weight:700;color:var(--text);margin-bottom:4px">🖨️ Ready to print</div>
+      <div style="font-size:12px;color:var(--text-dim);line-height:1.6">Print on A4 label paper · Laminate for weather resistance<br>Avery L7162 labels recommended</div>
+      <div class="btns">
+        <button class="btn btn-p" onclick="window.print()">🖨️ Print All Stickers</button>
+        <button class="btn btn-s" onclick="copyURLs()">🔗 Copy Status URLs</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const SB_URL = 'https://birdozrudsgfferqgolv.supabase.co';
+const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJpcmRvenJ1ZHNnZmZlcnFnb2x2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzE2MzI4MzEsImV4cCI6MjA4NzIwODgzMX0.u8zKxOFHiMhfv1UTFImXV6Y7xR5CGjhSFY-iF9YQoRI';
+const OCM_KEY = '2fa247f0-d453-4689-a250-d042752a4134';
+const APP = 'https://chargespot.online';
+const STORAGE_KEY = 'chargespot_deployed';
+
+const { createClient } = supabase;
+const sb = createClient(SB_URL, SB_KEY);
+
+let deployedChargers = []; // saved to localStorage
+let searchResults = [];
+let generatedLinks = [];
+
+// ── HAVERSINE DISTANCE ──
+function distKm(lat1, lng1, lat2, lng2) {
+  const R = 6371;
+  const dLat = (lat2-lat1)*Math.PI/180;
+  const dLng = (lng2-lng1)*Math.PI/180;
+  const a = Math.sin(dLat/2)**2 + Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLng/2)**2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+}
+
+function fmtDist(km) {
+  return km < 1 ? Math.round(km*1000)+'m away' : km.toFixed(1)+'km away';
+}
+
+let userLat = null, userLng = null;
+
+// ── INIT — auto-load GPS on open ──
+window.addEventListener('load', () => {
+  loadDeployed();
+  renderDeployed();
+  updateDepCount();
+  // Auto-trigger GPS on load
+  if (navigator.geolocation) loadByGPS();
+});
+
+// ── GPS LOAD ──
+async function loadByGPS() {
+  if (!navigator.geolocation) {
+    setStatus('GPS not available — enter a postcode instead', 'ok');
+    return;
+  }
+  const btn = document.getElementById('gps-btn');
+  btn.textContent = '📡 Locating...';
+  btn.disabled = true;
+  setStatus('Getting your location...', 'loading');
+
+  navigator.geolocation.getCurrentPosition(
+    async pos => {
+      userLat = pos.coords.latitude;
+      userLng = pos.coords.longitude;
+      btn.textContent = '🎯 Use My Location';
+      btn.disabled = false;
+      await fetchAndRenderOCM(userLat, userLng, 'your location');
+    },
+    err => {
+      btn.textContent = '🎯 Use My Location';
+      btn.disabled = false;
+      setStatus('GPS denied — enter a postcode to search', 'ok');
+    },
+    { timeout: 8000, enableHighAccuracy: true }
+  );
+}
+
+function setStatus(txt, state = 'ok') {
+  document.getElementById('stxt').textContent = txt;
+  const dot = document.getElementById('sdot');
+  dot.className = 'sdot ' + state;
+}
+
+// ── TABS ──
+function switchTab(tab) {
+  ['search','deployed','print'].forEach(t => {
+    document.getElementById(`panel-${t}`).style.display = t === tab ? 'block' : 'none';
+    document.getElementById(`tab-${t}`).classList.toggle('active', t === tab);
+  });
+  if (tab === 'deployed') renderDeployed();
+  if (tab === 'print') populatePrintSelect();
+}
+
+// ── LOCAL STORAGE ──
+function loadDeployed() {
+  try {
+    const saved = localStorage.getItem(STORAGE_KEY);
+    deployedChargers = saved ? JSON.parse(saved) : [];
+  } catch(e) { deployedChargers = []; }
+}
+
+function saveDeployed() {
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(deployedChargers)); } catch(e) {}
+}
+
+function isDeployed(id) {
+  return deployedChargers.some(c => String(c.id) === String(id));
+}
+
+// ── SEARCH BY POSTCODE / NAME ──
+async function searchChargers() {
+  const query = document.getElementById('search-inp').value.trim();
+  if (!query) return;
+  const btn = document.getElementById('search-btn');
+  btn.disabled = true; btn.textContent = 'Searching...';
+
+  const isPostcode = /^[A-Z]{1,2}[0-9]/i.test(query.replace(/\s/g,''));
+  let lat = userLat || 51.5074, lng = userLng || -0.1278, label = query;
+
+  if (isPostcode) {
+    try {
+      const pcRes = await fetch(`https://api.postcodes.io/postcodes/${encodeURIComponent(query.replace(/\s/g,''))}`);
+      const pcData = await pcRes.json();
+      if (pcData.status === 200) {
+        lat = pcData.result.latitude;
+        lng = pcData.result.longitude;
+        label = query.toUpperCase();
+      }
+    } catch(e) {}
+  }
+
+  await fetchAndRenderOCM(lat, lng, label, !isPostcode ? query : null);
+  btn.disabled = false; btn.textContent = 'Search';
+}
+
+// ── CORE: FETCH FROM OCM + RENDER ──
+async function fetchAndRenderOCM(lat, lng, label = '', textFilter = null) {
+  const radius = parseFloat(document.getElementById('radius-slider').value) || 1;
+  const list = document.getElementById('results-list');
+  list.innerHTML = `<div class="empty-results"><div style="font-size:24px;animation:spin 1s linear infinite;display:inline-block">⚡</div><br>Finding chargers within ${radius}km of ${label}...</div>`;
+  setStatus(`Searching ${radius}km around ${label}...`, 'loading');
+
+  try {
+    const url = `https://api.openchargemap.io/v3/poi/?output=json&countrycode=GB&latitude=${lat}&longitude=${lng}&distance=${radius}&distanceunit=KM&maxresults=100&compact=true&verbose=false&key=${OCM_KEY}`;
+    const res = await fetch(url);
+    const data = await res.json();
+
+    if (!Array.isArray(data) || !data.length) {
+      list.innerHTML = '<div class="empty-results">No chargers found within this radius. Try increasing the distance or searching a different area.</div>';
+      setStatus('No results found', 'ok');
+      return;
+    }
+
+    // Map to charger objects with real distance
+    let results = data.map(poi => {
+      const cLat = poi.AddressInfo?.Latitude;
+      const cLng = poi.AddressInfo?.Longitude;
+      const dist = (lat && lng && cLat && cLng) ? distKm(lat, lng, cLat, cLng) : null;
+      const op = poi.OperatorInfo?.Title;
+      const street = poi.AddressInfo?.AddressLine1;
+      const town = poi.AddressInfo?.Town || poi.AddressInfo?.Postcode || 'UK';
+      return {
+        id: `ocm_${poi.ID}`,
+        // Skip private chargers
+        _skip: [2,3,6].includes(poi.UsageType?.ID ?? poi.UsageTypeID),
+        name: (op && !['Unknown','Unknown Operator'].includes(op))
+          ? `${op} — ${town}`
+          : (street ? `${street}, ${town}` : `EV Charger — ${town}`),
+        address: [poi.AddressInfo?.AddressLine1, poi.AddressInfo?.Town, poi.AddressInfo?.Postcode].filter(Boolean).join(', '),
+        lat: cLat, lng: cLng,
+        dist,
+        network: (op && !['Unknown','Unknown Operator'].includes(op)) ? op : 'Independent',
+        connections: poi.Connections?.length || 0,
+        kw: poi.Connections?.[0]?.PowerKW || null,
+      };
+    });
+
+    // Text filter (name/network search)
+    if (textFilter) {
+      const q = textFilter.toLowerCase();
+      results = results.filter(c =>
+        c.name.toLowerCase().includes(q) ||
+        c.network.toLowerCase().includes(q) ||
+        c.address.toLowerCase().includes(q)
+      );
+    }
+
+    // Network filter
+    const netF = document.getElementById('network-filter').value.toLowerCase();
+    if (netF) results = results.filter(c => c.network.toLowerCase().includes(netF));
+
+    // Sort
+    const sort = document.getElementById('sort-sel').value;
+    if (sort === 'distance') results.sort((a,b) => (a.dist||99)-(b.dist||99));
+    else if (sort === 'name') results.sort((a,b) => a.name.localeCompare(b.name));
+    else if (sort === 'network') results.sort((a,b) => a.network.localeCompare(b.network));
+
+    searchResults = results.filter(c => !c._skip);
+    renderResults();
+    setStatus(`✅ ${results.length} chargers within ${radius}km of ${label}`, 'ok');
+
+  } catch(e) {
+    list.innerHTML = `<div class="empty-results">Search failed: ${e.message}<br>Check your connection</div>`;
+    setStatus('Fetch failed — check connection', 'ok');
+    list.innerHTML = '<div class="empty-results">Could not load chargers. Check your internet connection.</div>';
+  }
+}
+
+function renderResults() {
+  const list = document.getElementById('results-list');
+  if (!searchResults.length) {
+    list.innerHTML = '<div class="empty-results">No matching chargers found — try adjusting the radius or filter</div>';
+    return;
+  }
+  list.innerHTML = searchResults.map(c => {
+    const dep = isDeployed(c.id);
+    const distStr = c.dist !== null ? fmtDist(c.dist) : '';
+    const connStr = c.connections ? `${c.connections} connector${c.connections!==1?'s':''}` : '';
+    const kwStr = c.kw ? `· ${c.kw}kW` : '';
+    const meta = [distStr, connStr+kwStr].filter(Boolean).join(' · ');
+    return `<div class="result-item ${dep ? 'deployed' : ''}" onclick="toggleDeploy('${c.id}')">
+      <div class="ri-info">
+        <div class="ri-name">${c.name}</div>
+        <div class="ri-addr">📍 ${c.address}</div>
+        ${meta ? `<div style="font-size:10px;color:var(--accent);font-weight:600;margin-top:3px">${meta}</div>` : ''}
+      </div>
+      <div class="ri-badge ${dep ? 'rb-deployed' : 'rb-add'}" id="badge-${c.id}">
+        ${dep ? '✅ Deployed' : '+ Add'}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// ── DEPLOY TOGGLE ──
+function toggleDeploy(id) {
+  const charger = searchResults.find(c => c.id === id);
+  if (!charger) return;
+
+  if (isDeployed(id)) {
+    deployedChargers = deployedChargers.filter(c => String(c.id) !== String(id));
+    setStatus(`Removed: ${charger.name}`, 'ok');
+  } else {
+    deployedChargers.push({ ...charger, deployedAt: new Date().toLocaleDateString('en-GB') });
+    setStatus(`Added to deployed: ${charger.name}`, 'ok');
+  }
+
+  saveDeployed();
+  updateDepCount();
+  renderResults(); // Refresh badges
+}
+
+function updateDepCount() {
+  const n = deployedChargers.length;
+  document.getElementById('dep-count').textContent = n;
+  document.getElementById('dep-count-label').textContent = `${n} charger${n !== 1 ? 's' : ''}`;
+}
+
+// ── RENDER DEPLOYED ──
+function renderDeployed() {
+  const el = document.getElementById('deployed-list');
+  if (!deployedChargers.length) {
+    el.innerHTML = `<div class="deployed-empty">
+      <div style="font-size:32px;margin-bottom:8px">📍</div>
+      No deployed chargers yet<br>
+      <span style="font-size:12px">Search for chargers and tap "+ Add" on ones you've physically visited</span>
+    </div>`;
+    return;
+  }
+  el.innerHTML = deployedChargers.map(c => `
+    <div class="dep-item">
+      <div style="font-size:20px">⚡</div>
+      <div class="dep-info">
+        <div class="dep-name">${c.name}</div>
+        <div class="dep-addr">📍 ${c.address}</div>
+      </div>
+      <div class="dep-date">${c.deployedAt || ''}</div>
+      <button class="dep-remove" onclick="removeDeployed('${c.id}')" title="Remove">✕</button>
+    </div>`).join('');
+}
+
+function removeDeployed(id) {
+  const c = deployedChargers.find(x => x.id === id);
+  if (!confirm(`Remove "${c?.name}" from deployed list?`)) return;
+  deployedChargers = deployedChargers.filter(x => x.id !== id);
+  saveDeployed();
+  updateDepCount();
+  renderDeployed();
+  populatePrintSelect();
+}
+
+// ── PRINT TAB ──
+function populatePrintSelect() {
+  const sel = document.getElementById('sel-charger');
+  sel.innerHTML = '<option value="all">All Deployed Chargers</option>';
+  deployedChargers.forEach(c => {
+    const opt = document.createElement('option');
+    opt.value = c.id;
+    opt.textContent = c.name;
+    sel.appendChild(opt);
+  });
+}
+
+async function generateStickers() {
+  if (!deployedChargers.length) {
+    alert('No deployed chargers yet. Search for chargers and add the ones you\'ve visited first.');
+    switchTab('search');
+    return;
+  }
+
+  const cid = document.getElementById('sel-charger').value;
+  const size = parseInt(document.getElementById('sel-size').value);
+  const btn = document.getElementById('gen-btn');
+  const grid = document.getElementById('stickers-grid');
+
+  btn.disabled = true; btn.textContent = 'Generating...';
+  grid.innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:40px;color:var(--text-dim)">Building stickers...</div>';
+  generatedLinks = [];
+
+  const list = cid === 'all' ? deployedChargers : deployedChargers.filter(c => c.id === cid);
+  grid.innerHTML = '';
+
+  for (const c of list) {
+    const url = `${APP}/status.html?c=${c.id}`;
+    generatedLinks.push({ name: c.name, url });
+
+    const el = document.createElement('div');
+    el.className = 'sticker';
+    const qid = 'q' + c.id.replace(/[^a-zA-Z0-9]/g,'') + Date.now();
+    el.innerHTML = `
+      <div class="s-top">
+        <div class="s-logo">Charge<em>Spot</em></div>
+        <div class="s-tag">EV Charging · UK</div>
+      </div>
+      <div class="s-body">
+        <div class="s-qr" id="${qid}"></div>
+        <div class="s-name">${c.name}</div>
+        <div class="s-addr">📍 ${c.address}</div>
+        <div class="s-inst"><strong>Scan to check &amp; book</strong>Live availability · Reserve for £1.50 · Honour system</div>
+      </div>
+      <div class="s-bot">
+        <div class="s-url">chargespot.online</div>
+        <div class="s-id">${c.id.replace('ocm_','#')}</div>
+      </div>`;
+    grid.appendChild(el);
+
+    new QRCode(document.getElementById(qid), {
+      text: url,
+      width: size,
+      height: size,
+      colorDark: '#08121e',
+      colorLight: '#f0f7ff',
+      correctLevel: QRCode.CorrectLevel.H
+    });
+
+    await new Promise(r => setTimeout(r, 80));
+  }
+
+  btn.disabled = false; btn.textContent = '⚡ Generate Stickers';
+  setStatus(`✅ ${list.length} sticker${list.length > 1 ? 's' : ''} ready`, 'ok');
+  const pw = document.getElementById('print-wrap');
+  pw.classList.add('show');
+  pw.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+function copyURLs() {
+  const txt = generatedLinks.map(l => `${l.name}\n${l.url}`).join('\n\n');
+  navigator.clipboard.writeText(txt)
+    .then(() => alert('✅ URLs copied!'))
+    .catch(() => prompt('Copy these:', txt));
+}
+</script>
+</body>
+</html>
