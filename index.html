@@ -936,17 +936,19 @@ function hideSplash() {
   if (splash) { splash.classList.add('hide'); setTimeout(() => splash.style.display = 'none', 400); }
 }
 
-function bootApp(session) {
+async function bootApp(session) {
   if (appReady) return;
   appReady = true;
   hideSplash();
   currentUser = session?.user || null;
   const nav = document.getElementById('bottom-nav');
   if (currentUser) {
-    showScreen('home');
     nav.classList.add('show');
     setGreeting();
-    checkReturnFromStripe();
+    // Check for Stripe return FIRST and await it — before showing any screen
+    // This ensures markPaid completes and bookings load before we navigate
+    const didReturn = await checkReturnFromStripe();
+    if (!didReturn) showScreen('home');
     loadData();
     checkForChargerDeepLink();
     setupRealtime();
@@ -956,6 +958,7 @@ function bootApp(session) {
     nav.classList.remove('show');
   }
 }
+
 
 // onAuthStateChange fires first with INITIAL_SESSION — use this as the boot signal
 sb.auth.onAuthStateChange((event, session) => {
@@ -972,7 +975,8 @@ sb.auth.onAuthStateChange((event, session) => {
     showScreen('home');
     nav.classList.add('show');
     setGreeting();
-    checkReturnFromStripe();
+    const didReturn2 = await checkReturnFromStripe();
+    if (!didReturn2) showScreen('home');
     loadData();
     checkForChargerDeepLink();
     setupRealtime();
@@ -1053,7 +1057,7 @@ async function checkReturnFromStripe() {
   const ref = params.get('ref');
   const type = params.get('type');
 
-  // Clear URL params immediately so refresh doesn't re-trigger this
+  // Clear URL immediately so refresh never re-triggers this
   if (payment || ref) {
     window.history.replaceState({}, '', APP_URL);
   }
@@ -1061,26 +1065,29 @@ async function checkReturnFromStripe() {
   if (payment === 'success' && ref) {
     localStorage.removeItem('cs_pending_ref');
     localStorage.removeItem('cs_pending_type');
-    // Mark paid in DB, load bookings, navigate to bookings tab
+    // Await markPaid so DB is updated and bookings loaded before navigating
     await markPaid(ref, type);
     goTo('bookings');
-    return;
+    return true; // tells bootApp not to show home screen
   }
 
   if (payment === 'cancelled') {
     localStorage.removeItem('cs_pending_ref');
     localStorage.removeItem('cs_pending_type');
     toast('Payment cancelled', 'No charge was made', 'amber');
-    return;
+    return false;
   }
 
-  // Fallback: check localStorage for a pending booking (e.g. if redirect lost params)
+  // Fallback: check localStorage for a pending booking
   const pendingRef = localStorage.getItem('cs_pending_ref');
   const pendingType = localStorage.getItem('cs_pending_type');
   if (pendingRef) {
     pollForPayment(pendingRef, pendingType);
   }
+
+  return false;
 }
+
 
 async function pollForPayment(ref, type) {
   // Poll up to 10 times (20 seconds) to see if booking moved to paid
