@@ -932,7 +932,14 @@ let installPrompt = null;
 let ocmLoaded = false;
 
 // ── PWA ──
-if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(() => {});
+if ('serviceWorker' in navigator) {
+  // Unregister ALL old service workers, then register fresh
+  navigator.serviceWorker.getRegistrations().then(regs => {
+    Promise.all(regs.map(r => r.unregister())).then(() => {
+      navigator.serviceWorker.register('/sw.js').catch(() => {});
+    });
+  });
+}
 window.addEventListener('beforeinstallprompt', e => {
   e.preventDefault(); installPrompt = e;
   setTimeout(() => document.getElementById('install-banner').classList.add('show'), 4000);
