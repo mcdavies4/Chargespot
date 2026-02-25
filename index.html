@@ -1906,12 +1906,26 @@ async function doPayment() {
   const ref = 'CS' + Math.random().toString(36).substr(2,6).toUpperCase();
   const duration = payType==='reservation' ? parseInt(document.getElementById('ps-dur').value) : Math.round(parseInt(document.getElementById('kwh-sl').value)*3);
 
+  // Format booking_time as a real ISO datetime if possible
+  let bookingDateTime = selectedTime;
+  if (selectedTime && selectedTime.match(/^\d{2}:\d{2}$/)) {
+    const today = new Date();
+    const [h, m] = selectedTime.split(':');
+    today.setHours(parseInt(h), parseInt(m), 0, 0);
+    bookingDateTime = today.toISOString();
+  }
+
   const { error } = await sb.from('bookings').insert({
     user_id: currentUser.id,
     charger_id: typeof selectedCharger.id === 'string' && selectedCharger.id.startsWith('ocm_') ? null : selectedCharger.id,
+    charger_ocm_id: selectedCharger.ocmId || selectedCharger.id || null,
+    charger_name: selectedCharger.name || '',
+    charger_address: selectedCharger.address || '',
+    charger_lat: selectedCharger.lat || null,
+    charger_lng: selectedCharger.lng || null,
     slot_id: (selectedSlotId && !String(selectedSlotId).startsWith('ocm_')) ? selectedSlotId : null,
     ref, name, reg,
-    booking_time: selectedTime || 'Session',
+    booking_time: bookingDateTime || 'Session',
     duration_minutes: duration,
     status: 'pending_payment',
     payment_status: 'unpaid',
@@ -2053,37 +2067,107 @@ function renderBookings() {
     var isCheckedIn = b.status === 'checked_in';
     var isRefunded = b.payment_status === 'refunded';
     var isRefundReq = b.payment_status === 'refund_requested';
-    var chargerName = (b.chargers && b.chargers.name) ? b.chargers.name : (b.charger_name || 'EV Charger');
-    var chargerAddr = (b.chargers && b.chargers.address) ? b.chargers.address : '';
+
+    // Charger details — prefer inline saved values over join (works for OCM chargers too)
+    var chargerName = (b.charger_name) || (b.chargers && b.chargers.name) || 'EV Charger';
+    var chargerAddr = (b.charger_address) || (b.chargers && b.chargers.address) || '';
+    var chargerLat = b.charger_lat;
+    var chargerLng = b.charger_lng;
+
+    // Format date nicely — handle ISO datetime, time-only (HH:MM), or raw string
+    var dateLabel = '';
+    var timeLabel = '';
+    if (b.booking_time && b.booking_time !== 'Session') {
+      try {
+        if (/^\d{2}:\d{2}/.test(b.booking_time)) {
+          // Time only like "14:30" — show just the time
+          timeLabel = b.booking_time;
+          dateLabel = 'Today';
+        } else {
+          var dt = new Date(b.booking_time);
+          if (!isNaN(dt.getTime())) {
+            var now = new Date();
+            var isToday = dt.toDateString() === now.toDateString();
+            var isTomorrow = dt.toDateString() === new Date(now.getTime()+86400000).toDateString();
+            dateLabel = isToday ? 'Today' : isTomorrow ? 'Tomorrow' : dt.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' });
+            timeLabel = dt.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+          } else {
+            dateLabel = b.booking_time;
+          }
+        }
+      } catch(e) { dateLabel = b.booking_time; }
+    }
+    var bookedOn = b.created_at ? new Date(b.created_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : '';
+
     var isUpcoming = false, isOverdue = false;
-    try { var m=(new Date(b.booking_time)-Date.now())/60000; isUpcoming=m>0&&m<=30; isOverdue=m<-15; } catch(e) {}
+    try {
+      var minsUntil = (new Date(b.booking_time) - Date.now()) / 60000;
+      isUpcoming = minsUntil > 0 && minsUntil <= 60;
+      isOverdue = minsUntil < -15;
+    } catch(e) {}
+
     var pillClass = isCheckedIn?'sp-paid':isRefundReq?'sp-refund':isRefunded?'sp-refund':isPaid?'sp-paid':'sp-pending';
     var pillLabel = isCheckedIn?'⚡ Charging':isRefundReq?'⚠️ Refund Req':isRefunded?'💚 Refunded':isPaid?'✅ Paid':'⏳ Pending';
 
     var card = document.createElement('div');
     card.className = 'bk-card fade-up';
 
-    var inner = '<div class="bk-header"><div class="bk-name">'+chargerName+'</div><div class="bk-ref'+(isPaid?' paid':'')+'">'+b.ref+'</div></div>';
-    inner += '<div class="bk-addr">📍 '+chargerAddr+'</div>';
-    inner += '<div class="bk-meta"><span>🕐 '+(b.booking_time||'Session')+'</span><span>⏱ '+b.duration_minutes+'min</span><span>🚗 '+(b.reg||'')+'</span><span class="status-pill '+pillClass+'">'+pillLabel+'</span></div>';
+    // Maps link if we have coords
+    var mapsUrl = chargerLat && chargerLng
+      ? 'https://maps.google.com/?q=' + chargerLat + ',' + chargerLng
+      : chargerAddr ? 'https://maps.google.com/?q=' + encodeURIComponent(chargerAddr) : null;
 
-    if (isCheckedIn) {
-      inner += '<div style="background:linear-gradient(135deg,#001a10,#002a18);border:1px solid var(--green);border-radius:12px;padding:14px;margin-top:10px;text-align:center"><div style="font-size:22px">⚡</div><div style="color:var(--green);font-weight:700">You are checked in</div><div style="color:var(--text-dim);font-size:12px;margin-top:2px">Charging session active</div></div>';
-    } else if (isPaid && !isRefunded && !isRefundReq) {
-      inner += '<button class="checkin-btn" data-id="'+b.id+'" data-ref="'+b.ref+'" style="width:100%;margin-top:10px;padding:14px;border-radius:12px;border:2px solid var(--green);background:linear-gradient(135deg,#001a10,#002a18);color:var(--green);font-size:14px;font-weight:800;cursor:pointer">📍 I have Arrived — Check In</button>';
-      if (isUpcoming) inner += '<div style="font-size:11px;color:var(--amber);margin-top:8px;text-align:center">⏳ Arriving soon? Check in when you reach the charger</div>';
-      if (isOverdue) inner += '<div style="font-size:11px;color:#ff4444;margin-top:8px;text-align:center">⚠️ Slot may have been released — check in to confirm</div>';
+    var inner = '<div class="bk-header">' +
+      '<div class="bk-name">' + chargerName + '</div>' +
+      '<div class="bk-ref' + (isPaid?' paid':'') + '">' + b.ref + '</div>' +
+    '</div>';
+
+    // Address with maps link + directions button
+    if (chargerAddr) {
+      inner += '<div style="margin-bottom:8px">' +
+        '<div class="bk-addr" style="margin-bottom:4px">📍 ' + chargerAddr + '</div>';
+      if (mapsUrl) {
+        inner += '<a href="' + mapsUrl + '" target="_blank" style="display:inline-block;background:rgba(0,200,255,0.1);border:1px solid var(--accent);border-radius:8px;padding:5px 12px;color:var(--accent);font-size:12px;font-weight:700;text-decoration:none;margin-top:2px">🗺 Get Directions ↗</a>';
+      }
+      inner += '</div>';
     }
 
-    inner += '<div style="display:flex;gap:8px;margin-top:10px">';
-    if (!isCheckedIn && !isRefunded) inner += '<button class="bk-cancel cancel-btn" data-id="'+b.id+'" data-slot="'+(b.slot_id||'')+'" style="flex:1;margin-top:0">✕ Cancel</button>';
-    if (isPaid && !isCheckedIn && !isRefunded && !isRefundReq) inner += '<button class="bk-refund refund-btn" data-id="'+b.id+'" data-ref="'+b.ref+'" style="flex:1">⚠️ Slot Occupied</button>';
+    // Date + time row
+    inner += '<div style="display:flex;gap:12px;align-items:center;margin-bottom:8px;flex-wrap:wrap">';
+    if (dateLabel) inner += '<span style="font-size:13px;color:var(--text)">📅 ' + dateLabel + '</span>';
+    if (timeLabel) inner += '<span style="font-size:13px;font-weight:700;color:var(--accent)">🕐 ' + timeLabel + '</span>';
+    if (!dateLabel && !timeLabel && bookedOn) inner += '<span style="font-size:12px;color:var(--text-dim)">Booked ' + bookedOn + '</span>';
+    inner += '<span style="font-size:12px;color:var(--text-dim)">⏱ ' + b.duration_minutes + ' min</span>';
     inner += '</div>';
-    inner += '<div class="refund-sent" id="rs-'+b.id+'">✅ Refund request sent — we will process within 24hrs</div>';
+
+    // Vehicle + status
+    inner += '<div class="bk-meta">' +
+      '<span>🚗 ' + (b.reg||'') + '</span>' +
+      '<span class="status-pill ' + pillClass + '">' + pillLabel + '</span>' +
+    '</div>';
+
+    // Check-in section
+    if (isCheckedIn) {
+      inner += '<div style="background:linear-gradient(135deg,#001a10,#002a18);border:1px solid var(--green);border-radius:12px;padding:14px;margin-top:10px;text-align:center">' +
+        '<div style="font-size:22px">⚡</div>' +
+        '<div style="color:var(--green);font-weight:700">You are checked in</div>' +
+        '<div style="color:var(--text-dim);font-size:12px;margin-top:2px">Charging session active — enjoy!</div>' +
+      '</div>';
+    } else if (isPaid && !isRefunded && !isRefundReq) {
+      inner += '<button class="checkin-btn" data-id="' + b.id + '" data-ref="' + b.ref + '" style="width:100%;margin-top:10px;padding:14px;border-radius:12px;border:2px solid var(--green);background:linear-gradient(135deg,#001a10,#002a18);color:var(--green);font-size:14px;font-weight:800;cursor:pointer">📍 I have Arrived — Check In</button>';
+      if (isUpcoming) inner += '<div style="font-size:11px;color:var(--amber);margin-top:6px;text-align:center">⏳ Your slot is coming up — check in when you arrive</div>';
+      if (isOverdue) inner += '<div style="font-size:11px;color:#ff4444;margin-top:6px;text-align:center">⚠️ Slot may have been released — check in to confirm</div>';
+    }
+
+    // Action buttons
+    inner += '<div style="display:flex;gap:8px;margin-top:10px">';
+    if (!isCheckedIn && !isRefunded) inner += '<button class="bk-cancel cancel-btn" data-id="' + b.id + '" data-slot="' + (b.slot_id||'') + '" style="flex:1;margin-top:0">✕ Cancel</button>';
+    if (isPaid && !isCheckedIn && !isRefunded && !isRefundReq) inner += '<button class="bk-refund refund-btn" data-id="' + b.id + '" data-ref="' + b.ref + '" style="flex:1">⚠️ Slot Occupied</button>';
+    inner += '</div>';
+    inner += '<div class="refund-sent" id="rs-' + b.id + '">✅ Refund request sent — we will process within 24hrs</div>';
 
     card.innerHTML = inner;
 
-    // Attach event listeners using data attributes — no inline quote issues
     var ciBtn = card.querySelector('.checkin-btn');
     if (ciBtn) ciBtn.addEventListener('click', function() { manualCheckIn(this.dataset.id, this.dataset.ref); });
     var cancelBtn = card.querySelector('.cancel-btn');
