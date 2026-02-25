@@ -1,4 +1,4 @@
-const CACHE_NAME = 'chargespot-v4';
+const CACHE_NAME = 'chargespot-v5';
 const OFFLINE_URL = '/index.html';
 
 const PRECACHE = [
@@ -7,16 +7,14 @@ const PRECACHE = [
   '/manifest.json',
   '/icon-192.png',
   '/icon-512.png',
-  'https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500&display=swap',
-  'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2'
 ];
 
 // ── INSTALL ──
 self.addEventListener('install', event => {
+  // Skip waiting immediately — don't hold up new versions
+  self.skipWaiting();
   event.waitUntil(
-    caches.open(CACHE_NAME).then(cache => {
-      return cache.addAll(PRECACHE.filter(url => !url.startsWith('http')));
-    }).then(() => self.skipWaiting())
+    caches.open(CACHE_NAME).then(cache => cache.addAll(PRECACHE))
   );
 });
 
@@ -24,28 +22,46 @@ self.addEventListener('install', event => {
 self.addEventListener('activate', event => {
   event.waitUntil(
     caches.keys().then(keys =>
-      Promise.all(keys.filter(k => k !== CACHE_NAME).map(k => caches.delete(k)))
+      Promise.all(keys.filter(k => k !== CACHE_NAME).map(k => {
+        console.log('[SW] Deleting old cache:', k);
+        return caches.delete(k);
+      }))
     ).then(() => self.clients.claim())
   );
 });
 
-// ── FETCH (offline fallback) ──
+// ── FETCH — Network first, cache as fallback ──
+// HTML pages: always network first so deploys are instant
+// Assets: cache first for speed
 self.addEventListener('fetch', event => {
-  if (event.request.mode === 'navigate') {
+  const url = new URL(event.request.url);
+
+  // Skip non-GET and cross-origin API calls (Supabase, Stripe, etc)
+  if (event.request.method !== 'GET') return;
+  if (url.origin !== self.location.origin) return;
+
+  if (event.request.mode === 'navigate' || url.pathname.endsWith('.html')) {
+    // HTML: always go to network, fall back to cache only if offline
     event.respondWith(
-      fetch(event.request).catch(() => caches.match(OFFLINE_URL))
+      fetch(event.request).then(response => {
+        const clone = response.clone();
+        caches.open(CACHE_NAME).then(cache => cache.put(event.request, clone));
+        return response;
+      }).catch(() => caches.match(event.request) || caches.match(OFFLINE_URL))
     );
     return;
   }
+
+  // Static assets (icons, manifest): cache first
   event.respondWith(
     caches.match(event.request).then(cached => {
       if (cached) return cached;
       return fetch(event.request).then(response => {
-        if (!response || response.status !== 200 || response.type === 'opaque') return response;
+        if (!response || response.status !== 200) return response;
         const clone = response.clone();
         caches.open(CACHE_NAME).then(cache => cache.put(event.request, clone));
         return response;
-      }).catch(() => caches.match(OFFLINE_URL));
+      });
     })
   );
 });
@@ -58,7 +74,7 @@ self.addEventListener('push', event => {
     icon: '/icon-192.png',
     badge: '/icon-192.png',
     vibrate: [200, 100, 200],
-    data: { url: data.url || '/', chargerId: data.chargerId },
+    data: { url: data.url || '/' },
     actions: [
       { action: 'book', title: '⚡ Book Now' },
       { action: 'dismiss', title: 'Dismiss' }
@@ -79,39 +95,9 @@ self.addEventListener('notificationclick', event => {
   event.waitUntil(
     clients.matchAll({ type: 'window', includeUncontrolled: true }).then(clientList => {
       for (const client of clientList) {
-        if (client.url === url && 'focus' in client) return client.focus();
+        if ('focus' in client) return client.focus();
       }
       if (clients.openWindow) return clients.openWindow(url);
     })
   );
 });
-
-// ── BACKGROUND SYNC ──
-self.addEventListener('sync', event => {
-  if (event.tag === 'sync-bookings') {
-    event.waitUntil(syncOfflineBookings());
-  }
-});
-
-async function syncOfflineBookings() {
-  // When back online, retry any failed bookings stored in IndexedDB
-  const db = await openDB();
-  const tx = db.transaction('offline_bookings', 'readwrite');
-  const store = tx.objectStore('offline_bookings');
-  const items = await store.getAll();
-  for (const item of items) {
-    try {
-      await fetch('/api/bookings', { method: 'POST', body: JSON.stringify(item) });
-      await store.delete(item.id);
-    } catch(e) {}
-  }
-}
-
-function openDB() {
-  return new Promise((resolve, reject) => {
-    const req = indexedDB.open('chargespot', 1);
-    req.onupgradeneeded = e => e.target.result.createObjectStore('offline_bookings', { keyPath: 'id' });
-    req.onsuccess = e => resolve(e.target.result);
-    req.onerror = reject;
-  });
-}

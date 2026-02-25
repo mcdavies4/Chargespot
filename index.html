@@ -739,7 +739,15 @@ input[type=range]{width:100%;accent-color:var(--accent)}
       <button class="notif-btn" onclick="requestPushPermission()">Enable</button>
     </div>
   </div>
+  <div style="display:flex;justify-content:space-between;align-items:center;padding:0 16px 12px">
+    <div id="bk-count-lbl2" style="font-size:13px;color:var(--text-dim);font-weight:600"></div>
+    <button onclick="togglePastBookings()" id="past-toggle-btn"
+      style="background:transparent;border:1px solid rgba(255,255,255,0.15);border-radius:8px;padding:6px 12px;color:var(--text-dim);font-size:12px;font-weight:600;cursor:pointer;font-family:'Outfit',sans-serif">
+      🗂 Show Past
+    </button>
+  </div>
   <div class="bk-scroll" id="bk-list"></div>
+  <div class="bk-scroll" id="bk-past-list" style="display:none"></div>
 </div>
 
 <!-- ── ADMIN ── -->
@@ -940,7 +948,10 @@ let appReady = false;
 
 function hideSplash() {
   const splash = document.getElementById('screen-loading');
-  if (splash) { splash.classList.add('hide'); setTimeout(() => splash.style.display = 'none', 400); }
+  if (!splash) return;
+  splash.style.pointerEvents = 'none';
+  splash.classList.add('hide');
+  setTimeout(() => { splash.style.display = 'none'; }, 400);
 }
 
 function bootApp(session) {
@@ -1000,7 +1011,21 @@ sb.auth.onAuthStateChange((event, session) => {
 });
 
 // Fallback — if onAuthStateChange never fires within 4s, show auth
-setTimeout(() => { if (!appReady) { appReady = true; hideSplash(); showScreen('auth'); document.getElementById('bottom-nav').classList.remove('show'); } }, 2500);
+// Hard fallback — if ANYTHING goes wrong, splash clears after 4 seconds no matter what
+setTimeout(() => {
+  if (!appReady) {
+    console.log('[CS] Fallback timeout fired — forcing splash off');
+    appReady = true;
+    hideSplash();
+    showScreen('auth');
+    document.getElementById('bottom-nav').classList.remove('show');
+  }
+}, 4000);
+// Nuclear fallback — splash element hidden directly after 6s regardless
+setTimeout(() => {
+  const splash = document.getElementById('screen-loading');
+  if (splash) splash.style.display = 'none';
+}, 6000);
 
 function switchAuthTab(tab, el) {
   document.querySelectorAll('.auth-tab').forEach(t => t.classList.remove('active'));
@@ -1916,36 +1941,93 @@ async function doPayment() {
 }
 
 // ── BOOKINGS ──
+let showingPast = false;
+let pastBookings = [];
+
 async function loadBookings() {
   if (!currentUser) {
-    // Wait up to 5s for auth to restore
     let waited = 0;
     while (!currentUser && waited < 5000) {
       await new Promise(r => setTimeout(r, 300));
       waited += 300;
     }
-    if (!currentUser) {
-      console.log('[CS] loadBookings: no currentUser after wait, aborting');
-      return;
-    }
+    if (!currentUser) return;
   }
-  // Get fresh session token to ensure RLS works
   const { data: { session } } = await sb.auth.getSession();
-  if (!session) {
-    console.log('[CS] loadBookings: no session, aborting');
-    return;
-  }
+  if (!session) return;
+
+  // Active bookings
   const { data, error } = await sb.from('bookings')
     .select('*, chargers(name,address)')
     .eq('user_id', currentUser.id)
     .not('status', 'eq', 'cancelled')
     .order('created_at', { ascending: false });
-  console.log('[CS] loadBookings — rows:', data?.length, 'error:', error?.message, 'uid:', currentUser.id);
+
+  console.log('[CS] loadBookings — rows:', data?.length, 'error:', error?.message);
   userBookings = data || [];
   renderBookings();
-  document.getElementById('bk-count-lbl').textContent = userBookings.length ? `${userBookings.length} active` : 'No bookings yet';
+
+  // Update count labels
+  const activeCount = userBookings.filter(b => b.status !== 'checked_in' || isBookingActive(b)).length;
+  const countEl = document.getElementById('bk-count-lbl');
+  if (countEl) countEl.textContent = userBookings.length ? `${userBookings.length} active` : 'No bookings yet';
+
   scheduleBookingReminders();
+
+  // Also load past (cancelled) in background
+  const { data: past } = await sb.from('bookings')
+    .select('*, chargers(name,address)')
+    .eq('user_id', currentUser.id)
+    .eq('status', 'cancelled')
+    .order('created_at', { ascending: false })
+    .limit(20);
+  pastBookings = past || [];
+  if (showingPast) renderPastBookings();
 }
+
+function isBookingActive(b) {
+  try {
+    const bt = new Date(b.booking_time);
+    return (Date.now() - bt) < (b.duration_minutes || 60) * 60000;
+  } catch(e) { return true; }
+}
+
+function togglePastBookings() {
+  showingPast = !showingPast;
+  const btn = document.getElementById('past-toggle-btn');
+  const pastEl = document.getElementById('bk-past-list');
+  if (showingPast) {
+    btn.textContent = '✕ Hide Past';
+    pastEl.style.display = 'block';
+    renderPastBookings();
+  } else {
+    btn.textContent = '🗂 Show Past';
+    pastEl.style.display = 'none';
+  }
+}
+
+function renderPastBookings() {
+  const el = document.getElementById('bk-past-list');
+  if (!el) return;
+  if (!pastBookings.length) {
+    el.innerHTML = '<div style="text-align:center;padding:20px;color:var(--text-dim);font-size:13px">No past bookings</div>';
+    return;
+  }
+  el.innerHTML = '<div style="padding:0 16px 8px;font-size:12px;color:var(--text-dim);font-weight:700;text-transform:uppercase;letter-spacing:1px">Past Bookings</div>' +
+    pastBookings.map(b => `
+    <div class="bk-card fade-up" style="opacity:0.6">
+      <div class="bk-header">
+        <div class="bk-name" style="font-size:14px">${b.chargers?.name || 'EV Charger'}</div>
+        <div class="bk-ref">${b.ref}</div>
+      </div>
+      <div class="bk-meta">
+        <span>🕐 ${b.booking_time || '—'}</span>
+        <span>🚗 ${b.reg || '—'}</span>
+        <span class="status-pill sp-pending">Cancelled</span>
+      </div>
+    </div>`).join('');
+}
+
 
 
 
@@ -2032,28 +2114,44 @@ function renderBookings() {
 }
 
 async function cancelBooking(id, slotId) {
-  if (!confirm('Cancel this booking? This cannot be undone.')) return;
-  // Only update status — don't touch payment_status to avoid constraint violations
+  const bk = userBookings.find(b => b.id === id);
+  const isPaid = bk?.payment_status === 'paid';
+  const isCheckedIn = bk?.status === 'checked_in';
+
+  // Build confirm message based on state
+  let msg = 'Cancel this booking?';
+  if (isPaid && !isCheckedIn) msg = 'Cancel this booking?\n\nNote: Your £1.50 payment is non-refundable for cancellations — refunds are only available if your slot was occupied on arrival.';
+  if (isCheckedIn) msg = 'End your charging session and cancel?';
+
+  if (!confirm(msg)) return;
+
+  // Remove card immediately for snappy UX
+  userBookings = userBookings.filter(b => b.id !== id);
+  renderBookings();
+
   const { error } = await sb.from('bookings')
     .update({ status: 'cancelled' })
-    .eq('id', id);
+    .eq('id', id)
+    .eq('user_id', currentUser.id);
+
   if (error) {
     console.error('Cancel error:', error);
+    // Re-add the booking to the list if it failed
+    await loadBookings();
     toast('Could not cancel', error.message, 'amber');
     return;
   }
-  // Remove from local array immediately so card disappears without waiting for DB round-trip
-  userBookings = userBookings.filter(b => b.id !== id);
-  renderBookings();
+
   // Free the slot if one was reserved
-  const slotIdClean = slotId && slotId !== 'null' && slotId !== null && slotId !== '' ? slotId : null;
+  const slotIdClean = slotId && slotId !== 'null' && slotId !== '' ? slotId : null;
   if (slotIdClean) {
     await sb.from('slots').update({ status: 'available' }).eq('id', slotIdClean);
   }
-  await loadBookings();
+
   scheduleBookingReminders();
-  toast('Booking cancelled', 'No further charges will be made', 'amber');
+  toast('Booking cancelled', isPaid ? 'Booking removed' : 'No charges made', 'amber');
 }
+
 
 async function requestRefund(id, ref, btn) {
   if (!confirm(`Request a refund for booking ${ref}?\n\nThis tells us your slot was occupied on arrival. We\'ll refund £1.50 within 24 hours.`)) return;
