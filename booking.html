@@ -1,0 +1,642 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#0a0f1e" />
+  <title>NestCharge — Book & Pay</title>
+  <link rel="manifest" href="manifest.json" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@600;700;800&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet" />
+  <script src="https://js.stripe.com/v3/"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #070c1a;
+      --bg2: #0d1428;
+      --surface: #111827;
+      --surface2: #1a2236;
+      --border: rgba(255,255,255,0.07);
+      --accent: #00e5a0;
+      --accent2: #0af;
+      --text: #f0f4ff;
+      --muted: #8892a4;
+      --error: #ff5e7d;
+      --font-head: 'Syne', sans-serif;
+      --font-body: 'DM Sans', sans-serif;
+    }
+
+    html, body {
+      min-height: 100%;
+      font-family: var(--font-body);
+      background: var(--bg);
+      color: var(--text);
+      font-weight: 300;
+      line-height: 1.6;
+    }
+
+    /* ── TOP BAR ── */
+    .topbar {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      padding: 1.25rem 1.25rem 0;
+    }
+
+    .back-btn {
+      width: 38px; height: 38px;
+      border-radius: 50%;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      color: var(--text);
+      font-size: 1rem;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      text-decoration: none;
+      transition: border-color 0.2s;
+    }
+    .back-btn:hover { border-color: rgba(255,255,255,0.25); }
+
+    .logo {
+      font-family: var(--font-head);
+      font-size: 1.1rem;
+      font-weight: 800;
+    }
+    .logo span { color: var(--accent); }
+
+    /* ── MAIN ── */
+    .main {
+      max-width: 480px;
+      margin: 0 auto;
+      padding: 1.5rem 1.25rem 4rem;
+    }
+
+    /* ── SCREENS ── */
+    .screen { display: none; }
+    .screen.active { display: block; }
+
+    /* ── SECTION TITLE ── */
+    .page-title {
+      font-family: var(--font-head);
+      font-size: 1.5rem;
+      font-weight: 800;
+      margin-bottom: 0.25rem;
+    }
+    .page-sub { font-size: 0.88rem; color: var(--muted); margin-bottom: 1.75rem; }
+
+    /* ── BOOKING SUMMARY CARD ── */
+    .summary-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 1.25rem;
+      padding: 1.25rem;
+      margin-bottom: 1.5rem;
+    }
+
+    .summary-host {
+      display: flex;
+      align-items: center;
+      gap: 0.875rem;
+      margin-bottom: 1.25rem;
+      padding-bottom: 1.25rem;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .host-avatar {
+      width: 48px; height: 48px;
+      border-radius: 50%;
+      background: var(--surface2);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.4rem;
+      border: 2px solid rgba(0,229,160,0.2);
+    }
+
+    .host-name {
+      font-family: var(--font-head);
+      font-size: 1rem;
+      font-weight: 700;
+    }
+    .host-meta { font-size: 0.78rem; color: var(--muted); margin-top: 0.15rem; }
+
+    .summary-rows { display: flex; flex-direction: column; gap: 0.75rem; }
+
+    .summary-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 0.88rem;
+    }
+    .summary-row .label { color: var(--muted); display: flex; align-items: center; gap: 0.4rem; }
+    .summary-row .value { font-weight: 500; }
+    .summary-row .value.accent { color: var(--accent); font-family: var(--font-head); font-size: 1rem; }
+
+    .divider {
+      height: 1px;
+      background: var(--border);
+      margin: 0.75rem 0;
+    }
+
+    .total-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-top: 0.25rem;
+    }
+    .total-label {
+      font-family: var(--font-head);
+      font-size: 0.9rem;
+      font-weight: 700;
+    }
+    .total-val {
+      font-family: var(--font-head);
+      font-size: 1.5rem;
+      font-weight: 800;
+      color: var(--accent);
+    }
+
+    /* ── PAYMENT FORM ── */
+    .form-label {
+      font-size: 0.75rem;
+      font-weight: 500;
+      letter-spacing: 0.07em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 0.5rem;
+      display: block;
+    }
+
+    .form-group { margin-bottom: 1.25rem; }
+
+    .form-input {
+      width: 100%;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 0.85rem 1rem;
+      border-radius: 0.875rem;
+      font-family: var(--font-body);
+      font-size: 0.95rem;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+    .form-input::placeholder { color: var(--muted); }
+    .form-input:focus { border-color: rgba(0,229,160,0.4); }
+
+    /* Stripe Elements container */
+    #card-element {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      padding: 0.875rem 1rem;
+      border-radius: 0.875rem;
+      transition: border-color 0.2s;
+    }
+    #card-element.focused { border-color: rgba(0,229,160,0.4); }
+
+    .card-error {
+      color: var(--error);
+      font-size: 0.82rem;
+      margin-top: 0.5rem;
+      min-height: 1.2rem;
+    }
+
+    /* ── TRUST BADGES ── */
+    .trust-row {
+      display: flex;
+      gap: 1rem;
+      margin-bottom: 1.5rem;
+      justify-content: center;
+    }
+
+    .trust-badge {
+      display: flex;
+      align-items: center;
+      gap: 0.3rem;
+      font-size: 0.75rem;
+      color: var(--muted);
+    }
+
+    /* ── PAY BUTTON ── */
+    .pay-btn {
+      width: 100%;
+      background: var(--accent);
+      color: #000;
+      border: none;
+      padding: 1rem;
+      border-radius: 100px;
+      font-family: var(--font-head);
+      font-size: 1rem;
+      font-weight: 700;
+      cursor: pointer;
+      transition: opacity 0.2s, transform 0.2s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.5rem;
+    }
+    .pay-btn:hover { opacity: 0.9; transform: translateY(-1px); }
+    .pay-btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+
+    .pay-btn .spinner {
+      width: 18px; height: 18px;
+      border: 2px solid rgba(0,0,0,0.3);
+      border-top-color: #000;
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+      display: none;
+    }
+    .pay-btn.loading .spinner { display: block; }
+    .pay-btn.loading .btn-text { display: none; }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    /* ── SUCCESS SCREEN ── */
+    .success-wrap {
+      text-align: center;
+      padding: 3rem 1rem;
+    }
+
+    .success-icon {
+      width: 80px; height: 80px;
+      border-radius: 50%;
+      background: rgba(0,229,160,0.12);
+      border: 2px solid rgba(0,229,160,0.3);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 2.5rem;
+      margin: 0 auto 1.5rem;
+      animation: popIn 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+    }
+
+    @keyframes popIn {
+      from { transform: scale(0.5); opacity: 0; }
+      to { transform: scale(1); opacity: 1; }
+    }
+
+    .success-title {
+      font-family: var(--font-head);
+      font-size: 1.75rem;
+      font-weight: 800;
+      margin-bottom: 0.5rem;
+    }
+
+    .success-sub { color: var(--muted); font-size: 0.9rem; margin-bottom: 2rem; }
+
+    .booking-ref {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 1.25rem;
+      padding: 1.25rem;
+      margin-bottom: 1.5rem;
+      text-align: left;
+    }
+
+    .ref-label {
+      font-size: 0.7rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--muted);
+      margin-bottom: 0.3rem;
+    }
+
+    .ref-number {
+      font-family: var(--font-head);
+      font-size: 1.1rem;
+      font-weight: 700;
+      color: var(--accent);
+      letter-spacing: 0.05em;
+    }
+
+    .success-details {
+      display: flex;
+      flex-direction: column;
+      gap: 0.6rem;
+      text-align: left;
+      margin-top: 1rem;
+    }
+
+    .success-detail-row {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.85rem;
+    }
+    .success-detail-row .k { color: var(--muted); }
+    .success-detail-row .v { font-weight: 500; }
+
+    .btn-secondary {
+      width: 100%;
+      background: var(--surface);
+      color: var(--text);
+      border: 1px solid var(--border);
+      padding: 0.875rem;
+      border-radius: 100px;
+      font-family: var(--font-head);
+      font-size: 0.95rem;
+      font-weight: 700;
+      cursor: pointer;
+      transition: border-color 0.2s;
+      margin-top: 0.75rem;
+    }
+    .btn-secondary:hover { border-color: rgba(255,255,255,0.2); }
+
+    /* ── STEP INDICATOR ── */
+    .steps {
+      display: flex;
+      gap: 0.4rem;
+      margin-bottom: 1.75rem;
+    }
+    .step-dot {
+      height: 3px;
+      border-radius: 100px;
+      background: var(--border);
+      flex: 1;
+      transition: background 0.3s;
+    }
+    .step-dot.done { background: var(--accent); }
+  </style>
+</head>
+<body>
+
+  <!-- TOP BAR -->
+  <div class="topbar">
+    <a href="map.html" class="back-btn">←</a>
+    <div class="logo">Nest<span>Charge</span></div>
+  </div>
+
+  <div class="main">
+
+    <!-- SCREEN 1: BOOKING REVIEW -->
+    <div class="screen active" id="screen-review">
+      <div class="steps">
+        <div class="step-dot done"></div>
+        <div class="step-dot"></div>
+        <div class="step-dot"></div>
+      </div>
+
+      <div class="page-title">Review booking</div>
+      <p class="page-sub">Check your details before paying</p>
+
+      <div class="summary-card">
+        <div class="summary-host">
+          <div class="host-avatar">🏠</div>
+          <div>
+            <div class="host-name">Sarah's Driveway</div>
+            <div class="host-meta">Sarah M. · ⭐ 4.9 · 47 sessions · Type 2</div>
+          </div>
+        </div>
+        <div class="summary-rows">
+          <div class="summary-row">
+            <span class="label">📅 Date</span>
+            <span class="value" id="booking-date">Today</span>
+          </div>
+          <div class="summary-row">
+            <span class="label">🕐 Time slot</span>
+            <span class="value" id="booking-time">09:00 – 10:00</span>
+          </div>
+          <div class="summary-row">
+            <span class="label">⚡ Charger speed</span>
+            <span class="value">7kW · Type 2</span>
+          </div>
+          <div class="summary-row">
+            <span class="label">📍 Distance</span>
+            <span class="value">0.3 miles away</span>
+          </div>
+          <div class="divider"></div>
+          <div class="summary-row">
+            <span class="label">Charging (1hr × £0.28)</span>
+            <span class="value">£0.28</span>
+          </div>
+          <div class="summary-row">
+            <span class="label">Platform fee</span>
+            <span class="value">£0.07</span>
+          </div>
+          <div class="divider"></div>
+          <div class="total-row">
+            <span class="total-label">Total due</span>
+            <span class="total-val">£0.35</span>
+          </div>
+        </div>
+      </div>
+
+      <button class="pay-btn" onclick="goToPayment()">
+        <span class="btn-text">Continue to Payment →</span>
+      </button>
+    </div>
+
+    <!-- SCREEN 2: PAYMENT -->
+    <div class="screen" id="screen-payment">
+      <div class="steps">
+        <div class="step-dot done"></div>
+        <div class="step-dot done"></div>
+        <div class="step-dot"></div>
+      </div>
+
+      <div class="page-title">Pay securely</div>
+      <p class="page-sub">Powered by Stripe — your card details are never stored by NestCharge</p>
+
+      <div class="form-group">
+        <label class="form-label">Name on card</label>
+        <input class="form-input" type="text" id="cardholder-name" placeholder="John Smith" autocomplete="cc-name" />
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Card details</label>
+        <div id="card-element"></div>
+        <div class="card-error" id="card-error"></div>
+      </div>
+
+      <div class="trust-row">
+        <span class="trust-badge">🔒 SSL encrypted</span>
+        <span class="trust-badge">💳 Stripe secured</span>
+        <span class="trust-badge">✅ Cancel anytime</span>
+      </div>
+
+      <button class="pay-btn" id="pay-btn" onclick="handlePayment()">
+        <div class="spinner"></div>
+        <span class="btn-text">⚡ Pay £0.35</span>
+      </button>
+    </div>
+
+    <!-- SCREEN 3: SUCCESS -->
+    <div class="screen" id="screen-success">
+      <div class="steps">
+        <div class="step-dot done"></div>
+        <div class="step-dot done"></div>
+        <div class="step-dot done"></div>
+      </div>
+
+      <div class="success-wrap">
+        <div class="success-icon">⚡</div>
+        <div class="success-title">You're booked!</div>
+        <p class="success-sub">Sarah has been notified. Head over at your booked time and plug in.</p>
+
+        <div class="booking-ref">
+          <div class="ref-label">Booking reference</div>
+          <div class="ref-number" id="booking-ref">NC-000000</div>
+          <div class="success-details">
+            <div class="success-detail-row">
+              <span class="k">📍 Location</span>
+              <span class="v">Sarah's Driveway</span>
+            </div>
+            <div class="success-detail-row">
+              <span class="k">🕐 Time</span>
+              <span class="v" id="success-time">09:00 – 10:00</span>
+            </div>
+            <div class="success-detail-row">
+              <span class="k">⚡ Charger</span>
+              <span class="v">7kW · Type 2</span>
+            </div>
+            <div class="success-detail-row">
+              <span class="k">💷 Paid</span>
+              <span class="v" style="color:var(--accent)">£0.35</span>
+            </div>
+          </div>
+        </div>
+
+        <button class="pay-btn" onclick="window.location.href='map.html'">
+          <span class="btn-text">🗺 Back to Map</span>
+        </button>
+        <button class="btn-secondary" onclick="window.location.href='index.html'">
+          Go to Home
+        </button>
+      </div>
+    </div>
+
+  </div>
+
+  <script>
+    // ── SUPABASE ──
+    const { createClient } = supabase;
+    const sb = createClient(
+      'https://ovhezomrlrfajrmwbdya.supabase.co',
+      'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im92aGV6b21ybHJmYWpybXdiZHlhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzE5NjM1MzEsImV4cCI6MjA4NzUzOTUzMX0.UTFUvtMKkyIIdJrc0GewWyTzAtONymUqZo_jJtT2ONI'
+    );
+
+    // ── STRIPE SETUP ──
+    const stripe = Stripe('pk_test_7Kh52Z9L5mgEoE2rpqmImXNx');
+    const elements = stripe.elements({
+      appearance: {
+        theme: 'night',
+        variables: {
+          colorPrimary: '#00e5a0',
+          colorBackground: '#111827',
+          colorText: '#f0f4ff',
+          colorDanger: '#ff5e7d',
+          fontFamily: 'DM Sans, sans-serif',
+          borderRadius: '14px',
+        }
+      }
+    });
+
+    const cardElement = elements.create('card', {
+      style: {
+        base: {
+          color: '#f0f4ff',
+          fontFamily: 'DM Sans, sans-serif',
+          fontSize: '16px',
+          '::placeholder': { color: '#8892a4' }
+        }
+      }
+    });
+
+    cardElement.mount('#card-element');
+
+    cardElement.on('focus', () => document.getElementById('card-element').classList.add('focused'));
+    cardElement.on('blur', () => document.getElementById('card-element').classList.remove('focused'));
+    cardElement.on('change', (e) => {
+      document.getElementById('card-error').textContent = e.error ? e.error.message : '';
+    });
+
+    // ── SET TODAY'S DATE ──
+    const today = new Date();
+    const dateStr = today.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' });
+    document.getElementById('booking-date').textContent = dateStr;
+
+    // ── NAVIGATION ──
+    function goToPayment() {
+      document.getElementById('screen-review').classList.remove('active');
+      document.getElementById('screen-payment').classList.add('active');
+      window.scrollTo(0, 0);
+    }
+
+    // ── HANDLE PAYMENT ──
+    async function handlePayment() {
+      const btn = document.getElementById('pay-btn');
+      const name = document.getElementById('cardholder-name').value.trim();
+
+      if (!name) {
+        document.getElementById('card-error').textContent = 'Please enter the name on your card.';
+        return;
+      }
+
+      btn.disabled = true;
+      btn.classList.add('loading');
+      document.getElementById('card-error').textContent = '';
+
+      try {
+        const { paymentMethod, error } = await stripe.createPaymentMethod({
+          type: 'card',
+          card: cardElement,
+          billing_details: { name }
+        });
+
+        if (error) {
+          document.getElementById('card-error').textContent = error.message;
+          btn.disabled = false;
+          btn.classList.remove('loading');
+          return;
+        }
+
+        // Generate booking reference
+        const ref = 'NC-' + Math.random().toString(36).substr(2, 6).toUpperCase();
+
+        // Save booking to Supabase
+        const { data: { session } } = await sb.auth.getSession();
+        if (session) {
+          const totalAmount = 0.35;
+          const platformFee = parseFloat((totalAmount * 0.20).toFixed(2));
+          const hostPayout = parseFloat((totalAmount * 0.80).toFixed(2));
+
+          await sb.from('bookings').insert({
+            driver_id: session.user.id,
+            listing_id: null, // Will be real listing ID when map is fully wired
+            booking_date: new Date().toISOString().split('T')[0],
+            time_slot: '09:00',
+            duration_hours: 1,
+            total_amount: totalAmount,
+            platform_fee: platformFee,
+            host_payout: hostPayout,
+            status: 'confirmed',
+            stripe_payment_id: paymentMethod.id,
+            reference: ref
+          });
+        }
+
+        document.getElementById('booking-ref').textContent = ref;
+        document.getElementById('success-time').textContent = '09:00 – 10:00';
+
+        setTimeout(() => {
+          document.getElementById('screen-payment').classList.remove('active');
+          document.getElementById('screen-success').classList.add('active');
+          window.scrollTo(0, 0);
+        }, 800);
+
+      } catch (err) {
+        console.error(err);
+        document.getElementById('card-error').textContent = 'Something went wrong. Please try again.';
+        btn.disabled = false;
+        btn.classList.remove('loading');
+      }
+    }
+  </script>
+
+</body>
+</html>

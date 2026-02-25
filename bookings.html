@@ -1,0 +1,1009 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#0a0f1e" />
+  <title>NestCharge — My Bookings</title>
+  <link rel="manifest" href="manifest.json" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@600;700;800&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet" />
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #070c1a;
+      --bg2: #0d1428;
+      --surface: #111827;
+      --surface2: #1a2236;
+      --border: rgba(255,255,255,0.07);
+      --accent: #00e5a0;
+      --accent2: #0af;
+      --text: #f0f4ff;
+      --muted: #8892a4;
+      --error: #ff5e7d;
+      --warning: #ffa500;
+      --font-head: 'Syne', sans-serif;
+      --font-body: 'DM Sans', sans-serif;
+      --nav-h: 72px;
+    }
+
+    html { overflow-x: hidden; }
+
+    body {
+      min-height: 100vh;
+      font-family: var(--font-body);
+      background: var(--bg);
+      color: var(--text);
+      font-weight: 300;
+      padding-bottom: var(--nav-h);
+    }
+
+    /* ── HEADER ── */
+    .header {
+      padding: 1.25rem 1.25rem 0;
+      background: var(--bg);
+      position: sticky;
+      top: 0;
+      z-index: 10;
+    }
+
+    .header-top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 1.25rem;
+    }
+
+    .logo {
+      font-family: var(--font-head);
+      font-size: 1.2rem;
+      font-weight: 800;
+    }
+    .logo span { color: var(--accent); }
+
+    .avatar-btn {
+      width: 38px; height: 38px;
+      border-radius: 50%;
+      background: rgba(0,229,160,0.1);
+      border: 2px solid rgba(0,229,160,0.3);
+      color: var(--accent);
+      font-family: var(--font-head);
+      font-weight: 800;
+      font-size: 0.9rem;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      text-decoration: none;
+    }
+
+    /* ── GREETING ── */
+    .greeting {
+      padding: 0 1.25rem 1.25rem;
+    }
+
+    .greeting-name {
+      font-family: var(--font-head);
+      font-size: 1.4rem;
+      font-weight: 800;
+      line-height: 1.2;
+    }
+
+    .greeting-sub { font-size: 0.85rem; color: var(--muted); margin-top: 0.2rem; }
+
+    /* ── STATS ROW ── */
+    .stats-row {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 0.75rem;
+      padding: 0 1.25rem 1.5rem;
+    }
+
+    .stat-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 1rem;
+      padding: 0.875rem;
+      text-align: center;
+    }
+
+    .stat-val {
+      font-family: var(--font-head);
+      font-size: 1.4rem;
+      font-weight: 800;
+      color: var(--accent);
+    }
+
+    .stat-label { font-size: 0.7rem; color: var(--muted); margin-top: 0.15rem; }
+
+    /* ── FILTER TABS ── */
+    .filter-tabs {
+      display: flex;
+      gap: 0.5rem;
+      padding: 0 1.25rem 1rem;
+      overflow-x: auto;
+      scrollbar-width: none;
+    }
+    .filter-tabs::-webkit-scrollbar { display: none; }
+
+    .filter-tab {
+      padding: 0.4rem 1rem;
+      border-radius: 100px;
+      border: 1px solid var(--border);
+      background: var(--surface);
+      color: var(--muted);
+      font-size: 0.8rem;
+      font-family: var(--font-body);
+      white-space: nowrap;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .filter-tab:hover { border-color: rgba(255,255,255,0.2); color: var(--text); }
+    .filter-tab.active {
+      background: rgba(0,229,160,0.1);
+      border-color: rgba(0,229,160,0.35);
+      color: var(--accent);
+    }
+
+    /* ── MAIN SCROLL ── */
+    .scroll-area {
+      padding: 0 1.25rem 1rem;
+    }
+
+    /* ── SECTION LABEL ── */
+    .section-label {
+      font-size: 0.7rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--muted);
+      margin-bottom: 0.75rem;
+      margin-top: 0.5rem;
+    }
+
+    /* ── BOOKING CARD ── */
+    .booking-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 1.25rem;
+      padding: 1.1rem;
+      margin-bottom: 0.75rem;
+      cursor: pointer;
+      transition: border-color 0.25s, transform 0.2s;
+      position: relative;
+      overflow: hidden;
+    }
+    .booking-card:hover { border-color: rgba(0,229,160,0.25); transform: translateY(-1px); }
+
+    .booking-card::before {
+      content: '';
+      position: absolute;
+      left: 0; top: 0; bottom: 0;
+      width: 3px;
+      border-radius: 3px 0 0 3px;
+    }
+    .booking-card.upcoming::before { background: var(--accent); }
+    .booking-card.active-now::before { background: var(--accent2); }
+    .booking-card.completed::before { background: var(--muted); }
+    .booking-card.cancelled::before { background: var(--error); }
+
+    .card-top {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      margin-bottom: 0.875rem;
+    }
+
+    .card-host {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+    }
+
+    .host-emoji {
+      width: 40px; height: 40px;
+      border-radius: 50%;
+      background: var(--surface2);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.2rem;
+    }
+
+    .host-info-name {
+      font-weight: 500;
+      font-size: 0.92rem;
+      margin-bottom: 0.1rem;
+    }
+
+    .host-info-sub { font-size: 0.75rem; color: var(--muted); }
+
+    .status-badge {
+      font-size: 0.7rem;
+      font-weight: 600;
+      padding: 0.25rem 0.65rem;
+      border-radius: 100px;
+      white-space: nowrap;
+    }
+    .badge-upcoming { background: rgba(0,229,160,0.1); color: var(--accent); border: 1px solid rgba(0,229,160,0.2); }
+    .badge-active { background: rgba(0,170,255,0.1); color: var(--accent2); border: 1px solid rgba(0,170,255,0.2); animation: pulse 2s infinite; }
+    .badge-completed { background: rgba(255,255,255,0.05); color: var(--muted); border: 1px solid var(--border); }
+    .badge-cancelled { background: rgba(255,94,125,0.1); color: var(--error); border: 1px solid rgba(255,94,125,0.2); }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.6; }
+    }
+
+    .card-details {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0.5rem;
+      margin-bottom: 0.875rem;
+    }
+
+    .card-detail {
+      display: flex;
+      align-items: center;
+      gap: 0.35rem;
+      font-size: 0.78rem;
+      color: var(--muted);
+    }
+    .card-detail strong { color: var(--text); font-weight: 500; }
+
+    .card-bottom {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding-top: 0.75rem;
+      border-top: 1px solid var(--border);
+    }
+
+    .card-ref { font-size: 0.72rem; color: var(--muted); font-family: monospace; }
+
+    .card-price {
+      font-family: var(--font-head);
+      font-size: 1rem;
+      font-weight: 700;
+      color: var(--accent);
+    }
+
+    .card-actions {
+      display: flex;
+      gap: 0.5rem;
+      margin-top: 0.75rem;
+    }
+
+    .action-btn {
+      flex: 1;
+      padding: 0.55rem;
+      border-radius: 100px;
+      font-size: 0.78rem;
+      font-family: var(--font-body);
+      font-weight: 500;
+      cursor: pointer;
+      border: 1px solid var(--border);
+      background: var(--surface2);
+      color: var(--text);
+      transition: all 0.2s;
+      text-align: center;
+    }
+    .action-btn:hover { border-color: rgba(255,255,255,0.2); }
+    .action-btn.primary {
+      background: rgba(0,229,160,0.1);
+      border-color: rgba(0,229,160,0.3);
+      color: var(--accent);
+    }
+    .action-btn.danger {
+      background: rgba(255,94,125,0.08);
+      border-color: rgba(255,94,125,0.2);
+      color: var(--error);
+    }
+
+    /* ── ACTIVE CHARGING BANNER ── */
+    .charging-banner {
+      background: linear-gradient(135deg, rgba(0,170,255,0.12), rgba(0,229,160,0.08));
+      border: 1px solid rgba(0,170,255,0.25);
+      border-radius: 1.25rem;
+      padding: 1.1rem;
+      margin-bottom: 1rem;
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+    }
+
+    .charging-icon {
+      width: 44px; height: 44px;
+      border-radius: 50%;
+      background: rgba(0,170,255,0.15);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.3rem;
+      animation: chargeGlow 2s ease-in-out infinite;
+      flex-shrink: 0;
+    }
+
+    @keyframes chargeGlow {
+      0%, 100% { box-shadow: 0 0 0 0 rgba(0,170,255,0.3); }
+      50% { box-shadow: 0 0 0 8px rgba(0,170,255,0); }
+    }
+
+    .charging-info { flex: 1; }
+    .charging-title { font-weight: 500; font-size: 0.9rem; margin-bottom: 0.15rem; }
+    .charging-sub { font-size: 0.75rem; color: var(--muted); }
+
+    .charging-progress {
+      height: 4px;
+      background: var(--border);
+      border-radius: 100px;
+      margin-top: 0.6rem;
+      overflow: hidden;
+    }
+    .charging-fill {
+      height: 100%;
+      background: linear-gradient(90deg, var(--accent2), var(--accent));
+      border-radius: 100px;
+      width: 65%;
+      animation: chargeFill 3s ease-in-out infinite alternate;
+    }
+    @keyframes chargeFill {
+      from { width: 60%; }
+      to { width: 70%; }
+    }
+
+    /* ── EMPTY STATE ── */
+    .empty-state {
+      text-align: center;
+      padding: 3rem 1rem;
+      display: none;
+    }
+    .empty-state.show { display: block; }
+    .empty-icon { font-size: 3rem; margin-bottom: 1rem; }
+    .empty-title { font-family: var(--font-head); font-size: 1.1rem; font-weight: 700; margin-bottom: 0.4rem; }
+    .empty-sub { font-size: 0.85rem; color: var(--muted); margin-bottom: 1.5rem; }
+
+    .btn-accent {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      background: var(--accent);
+      color: #000;
+      border: none;
+      padding: 0.75rem 1.5rem;
+      border-radius: 100px;
+      font-family: var(--font-head);
+      font-size: 0.9rem;
+      font-weight: 700;
+      cursor: pointer;
+      text-decoration: none;
+      transition: opacity 0.2s;
+    }
+    .btn-accent:hover { opacity: 0.85; }
+
+    /* ── BOTTOM NAV ── */
+    .bottom-nav {
+      position: fixed;
+      bottom: 0; left: 0; right: 0;
+      height: var(--nav-h);
+      background: rgba(13,20,40,0.95);
+      backdrop-filter: blur(16px);
+      border-top: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-around;
+      padding: 0 0.5rem;
+      z-index: 100;
+    }
+
+    .nav-item {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0.25rem;
+      padding: 0.5rem 1rem;
+      border-radius: 0.875rem;
+      cursor: pointer;
+      text-decoration: none;
+      transition: background 0.2s;
+      min-width: 60px;
+    }
+    .nav-item:hover { background: rgba(255,255,255,0.04); }
+    .nav-item.active { background: rgba(0,229,160,0.08); }
+
+    .nav-icon { font-size: 1.3rem; line-height: 1; }
+
+    .nav-label {
+      font-size: 0.65rem;
+      font-weight: 500;
+      color: var(--muted);
+    }
+    .nav-item.active .nav-label { color: var(--accent); }
+
+    .nav-dot {
+      width: 5px; height: 5px;
+      border-radius: 50%;
+      background: var(--accent);
+      position: absolute;
+      top: 6px; right: 6px;
+    }
+
+    /* ── MODAL ── */
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.6);
+      z-index: 200;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.3s;
+    }
+    .modal-overlay.show { opacity: 1; pointer-events: all; }
+
+    .modal {
+      position: fixed;
+      bottom: 0; left: 0; right: 0;
+      background: var(--bg2);
+      border-radius: 1.75rem 1.75rem 0 0;
+      border-top: 1px solid var(--border);
+      padding: 1.25rem 1.25rem 2.5rem;
+      z-index: 201;
+      transform: translateY(100%);
+      transition: transform 0.4s cubic-bezier(0.32, 0.72, 0, 1);
+    }
+    .modal.open { transform: translateY(0); }
+
+    .modal-handle {
+      width: 40px; height: 4px;
+      background: rgba(255,255,255,0.15);
+      border-radius: 100px;
+      margin: 0 auto 1.25rem;
+    }
+
+    .modal-title {
+      font-family: var(--font-head);
+      font-size: 1.1rem;
+      font-weight: 800;
+      margin-bottom: 1.25rem;
+    }
+
+    .modal-detail-rows { margin-bottom: 1.25rem; }
+
+    .modal-row {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.85rem;
+      padding: 0.6rem 0;
+      border-bottom: 1px solid var(--border);
+    }
+    .modal-row:last-child { border-bottom: none; }
+    .modal-row .k { color: var(--muted); }
+    .modal-row .v { font-weight: 500; }
+
+    .modal-actions { display: flex; flex-direction: column; gap: 0.6rem; }
+
+    .modal-btn {
+      width: 100%;
+      padding: 0.875rem;
+      border-radius: 100px;
+      font-family: var(--font-body);
+      font-size: 0.92rem;
+      font-weight: 500;
+      cursor: pointer;
+      border: 1px solid var(--border);
+      background: var(--surface);
+      color: var(--text);
+      transition: all 0.2s;
+    }
+    .modal-btn.accent { background: var(--accent); color: #000; border-color: var(--accent); font-family: var(--font-head); font-weight: 700; }
+    .modal-btn.danger { color: var(--error); border-color: rgba(255,94,125,0.2); background: rgba(255,94,125,0.05); }
+    .modal-btn:hover { border-color: rgba(255,255,255,0.2); }
+  </style>
+</head>
+<body>
+
+  <!-- HEADER -->
+  <div class="header">
+    <div class="header-top">
+      <div class="logo">Nest<span>Charge</span></div>
+      <a href="auth.html" class="avatar-btn" id="avatar-btn">?</a>
+    </div>
+  </div>
+
+  <!-- GREETING -->
+  <div class="greeting">
+    <div class="greeting-name" id="greeting-name">My Bookings</div>
+    <div class="greeting-sub" id="greeting-sub">Track and manage your charging sessions</div>
+  </div>
+
+  <!-- STATS -->
+  <div class="stats-row">
+    <div class="stat-card">
+      <div class="stat-val">12</div>
+      <div class="stat-label">Sessions</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-val">£4.20</div>
+      <div class="stat-label">Total spent</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-val">47kWh</div>
+      <div class="stat-label">Energy used</div>
+    </div>
+  </div>
+
+  <!-- FILTER TABS -->
+  <div class="filter-tabs">
+    <button class="filter-tab active" onclick="filterBookings('all', this)">All</button>
+    <button class="filter-tab" onclick="filterBookings('upcoming', this)">⚡ Upcoming</button>
+    <button class="filter-tab" onclick="filterBookings('active', this)">🔵 Charging Now</button>
+    <button class="filter-tab" onclick="filterBookings('completed', this)">✅ Completed</button>
+    <button class="filter-tab" onclick="filterBookings('cancelled', this)">❌ Cancelled</button>
+  </div>
+
+  <!-- SCROLL AREA -->
+  <div class="scroll-area">
+
+    <!-- ACTIVE CHARGING BANNER -->
+    <div class="charging-banner" id="charging-banner">
+      <div class="charging-icon">⚡</div>
+      <div class="charging-info">
+        <div class="charging-title">Currently charging at James — Garage</div>
+        <div class="charging-sub">Started 14:32 · Est. complete 15:32 · 7kW</div>
+        <div class="charging-progress"><div class="charging-fill"></div></div>
+      </div>
+    </div>
+
+    <!-- UPCOMING -->
+    <div id="section-upcoming">
+      <div class="section-label">Upcoming</div>
+
+      <div class="booking-card upcoming" onclick="openModal('upcoming-1')">
+        <div class="card-top">
+          <div class="card-host">
+            <div class="host-emoji">🏠</div>
+            <div>
+              <div class="host-info-name">Sarah's Driveway</div>
+              <div class="host-info-sub">Sarah M. · ⭐ 4.9 · 0.3 miles</div>
+            </div>
+          </div>
+          <span class="status-badge badge-upcoming">Confirmed</span>
+        </div>
+        <div class="card-details">
+          <div class="card-detail">📅 <strong>Tomorrow</strong></div>
+          <div class="card-detail">🕐 <strong>09:00 – 10:00</strong></div>
+          <div class="card-detail">⚡ <strong>7kW Type 2</strong></div>
+          <div class="card-detail">📍 <strong>0.3 miles</strong></div>
+        </div>
+        <div class="card-bottom">
+          <span class="card-ref">NC-A7X9K2</span>
+          <span class="card-price">£0.35</span>
+        </div>
+        <div class="card-actions">
+          <button class="action-btn primary" onclick="event.stopPropagation(); getDirections()">🗺 Directions</button>
+          <button class="action-btn" onclick="event.stopPropagation(); openModal('upcoming-1')">View details</button>
+          <button class="action-btn danger" onclick="event.stopPropagation(); cancelBooking('NC-A7X9K2')">Cancel</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ACTIVE NOW -->
+    <div id="section-active">
+      <div class="section-label">Charging now</div>
+
+      <div class="booking-card active-now" onclick="openModal('active-1')">
+        <div class="card-top">
+          <div class="card-host">
+            <div class="host-emoji">🔌</div>
+            <div>
+              <div class="host-info-name">James — Garage</div>
+              <div class="host-info-sub">James K. · ⭐ 4.8 · 0.6 miles</div>
+            </div>
+          </div>
+          <span class="status-badge badge-active">🔵 Charging</span>
+        </div>
+        <div class="card-details">
+          <div class="card-detail">📅 <strong>Today</strong></div>
+          <div class="card-detail">🕐 <strong>14:00 – 15:00</strong></div>
+          <div class="card-detail">⚡ <strong>11kW Type 2</strong></div>
+          <div class="card-detail">🔋 <strong>65% complete</strong></div>
+        </div>
+        <div class="card-bottom">
+          <span class="card-ref">NC-B3M8P1</span>
+          <span class="card-price">£0.24</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- COMPLETED -->
+    <div id="section-completed">
+      <div class="section-label">Past sessions</div>
+
+      <div class="booking-card completed" onclick="openModal('completed-1')">
+        <div class="card-top">
+          <div class="card-host">
+            <div class="host-emoji">🏡</div>
+            <div>
+              <div class="host-info-name">Chen Family Home</div>
+              <div class="host-info-sub">Wei C. · ⭐ 4.9 · 1.4 miles</div>
+            </div>
+          </div>
+          <span class="status-badge badge-completed">Completed</span>
+        </div>
+        <div class="card-details">
+          <div class="card-detail">📅 <strong>20 Feb</strong></div>
+          <div class="card-detail">🕐 <strong>08:00 – 10:00</strong></div>
+          <div class="card-detail">⚡ <strong>22kW Type 2</strong></div>
+          <div class="card-detail">🔋 <strong>38kWh added</strong></div>
+        </div>
+        <div class="card-bottom">
+          <span class="card-ref">NC-C5R2L9</span>
+          <span class="card-price">£0.64</span>
+        </div>
+        <div class="card-actions">
+          <button class="action-btn primary" onclick="event.stopPropagation()">⭐ Leave review</button>
+          <button class="action-btn" onclick="event.stopPropagation()">🔄 Book again</button>
+        </div>
+      </div>
+
+      <div class="booking-card completed" onclick="openModal('completed-2')">
+        <div class="card-top">
+          <div class="card-host">
+            <div class="host-emoji">🌿</div>
+            <div>
+              <div class="host-info-name">Anita — Driveway</div>
+              <div class="host-info-sub">Anita B. · ⭐ 4.6 · 1.7 miles</div>
+            </div>
+          </div>
+          <span class="status-badge badge-completed">Completed</span>
+        </div>
+        <div class="card-details">
+          <div class="card-detail">📅 <strong>18 Feb</strong></div>
+          <div class="card-detail">🕐 <strong>19:00 – 21:00</strong></div>
+          <div class="card-detail">⚡ <strong>7kW Type 2</strong></div>
+          <div class="card-detail">🔋 <strong>14kWh added</strong></div>
+        </div>
+        <div class="card-bottom">
+          <span class="card-ref">NC-D1K7N4</span>
+          <span class="card-price">£0.44</span>
+        </div>
+        <div class="card-actions">
+          <button class="action-btn primary" onclick="event.stopPropagation()">⭐ Leave review</button>
+          <button class="action-btn" onclick="event.stopPropagation()">🔄 Book again</button>
+        </div>
+      </div>
+
+      <div class="booking-card completed">
+        <div class="card-top">
+          <div class="card-host">
+            <div class="host-emoji">🏠</div>
+            <div>
+              <div class="host-info-name">Sarah's Driveway</div>
+              <div class="host-info-sub">Sarah M. · ⭐ 4.9 · 0.3 miles</div>
+            </div>
+          </div>
+          <span class="status-badge badge-completed">Completed</span>
+        </div>
+        <div class="card-details">
+          <div class="card-detail">📅 <strong>15 Feb</strong></div>
+          <div class="card-detail">🕐 <strong>09:00 – 10:00</strong></div>
+          <div class="card-detail">⚡ <strong>7kW Type 2</strong></div>
+          <div class="card-detail">🔋 <strong>7kWh added</strong></div>
+        </div>
+        <div class="card-bottom">
+          <span class="card-ref">NC-E9W3Q7</span>
+          <span class="card-price">£0.35</span>
+        </div>
+        <div class="card-actions">
+          <button class="action-btn" onclick="event.stopPropagation()">🔄 Book again</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- CANCELLED -->
+    <div id="section-cancelled" style="display:none">
+      <div class="section-label">Cancelled</div>
+      <div class="booking-card cancelled">
+        <div class="card-top">
+          <div class="card-host">
+            <div class="host-emoji">🏢</div>
+            <div>
+              <div class="host-info-name">Priya's Flat Bay</div>
+              <div class="host-info-sub">Priya S. · ⭐ 5.0 · 0.8 miles</div>
+            </div>
+          </div>
+          <span class="status-badge badge-cancelled">Cancelled</span>
+        </div>
+        <div class="card-details">
+          <div class="card-detail">📅 <strong>12 Feb</strong></div>
+          <div class="card-detail">🕐 <strong>20:00 – 22:00</strong></div>
+          <div class="card-detail">⚡ <strong>3.6kW</strong></div>
+          <div class="card-detail">💷 <strong>Refunded</strong></div>
+        </div>
+        <div class="card-bottom">
+          <span class="card-ref">NC-F2T5X8</span>
+          <span class="card-price" style="color:var(--muted);text-decoration:line-through">£0.36</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- EMPTY STATE -->
+    <div class="empty-state" id="empty-state">
+      <div class="empty-icon">🔌</div>
+      <div class="empty-title">No bookings here</div>
+      <div class="empty-sub">Find a charger near you and book your first session</div>
+      <a href="map.html" class="btn-accent">⚡ Find a charger</a>
+    </div>
+
+  </div>
+
+  <!-- BOTTOM NAV -->
+  <nav class="bottom-nav">
+    <a href="index.html" class="nav-item">
+      <span class="nav-icon">🏠</span>
+      <span class="nav-label">Home</span>
+    </a>
+    <a href="map.html" class="nav-item">
+      <span class="nav-icon">🗺</span>
+      <span class="nav-label">Find</span>
+    </a>
+    <a href="bookings.html" class="nav-item active">
+      <span class="nav-icon">📋</span>
+      <span class="nav-label">Bookings</span>
+    </a>
+    <a href="host.html" class="nav-item">
+      <span class="nav-icon">🔌</span>
+      <span class="nav-label">Host</span>
+    </a>
+    <a href="auth.html" class="nav-item" id="nav-profile">
+      <span class="nav-icon">👤</span>
+      <span class="nav-label">Profile</span>
+    </a>
+  </nav>
+
+  <!-- BOOKING DETAIL MODAL -->
+  <div class="modal-overlay" id="modal-overlay" onclick="closeModal()"></div>
+  <div class="modal" id="modal">
+    <div class="modal-handle"></div>
+    <div class="modal-title" id="modal-title">Booking Details</div>
+    <div class="modal-detail-rows" id="modal-rows"></div>
+    <div class="modal-actions" id="modal-actions"></div>
+  </div>
+
+  <script>
+    // ── SUPABASE ──
+    const { createClient } = supabase;
+    const sb = createClient(
+      'https://ovhezomrlrfajrmwbdya.supabase.co',
+      'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im92aGV6b21ybHJmYWpybXdiZHlhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzE5NjM1MzEsImV4cCI6MjA4NzUzOTUzMX0.UTFUvtMKkyIIdJrc0GewWyTzAtONymUqZo_jJtT2ONI'
+    );
+
+    // ── LOAD USER AND REAL BOOKINGS ──
+    window.addEventListener('DOMContentLoaded', async () => {
+      const { data: { session } } = await sb.auth.getSession();
+      if (session) {
+        const user = session.user;
+        const meta = user.user_metadata || {};
+        const name = meta.full_name || meta.name || user.email.split('@')[0];
+        const first = name.split(' ')[0];
+        document.getElementById('greeting-name').textContent = 'Hey, ' + first + ' 👋';
+        document.getElementById('greeting-sub').textContent = 'Here are your charging sessions';
+        document.getElementById('avatar-btn').textContent = first.charAt(0).toUpperCase();
+
+        // Load real bookings from Supabase
+        await loadRealBookings(session.user.id);
+      }
+    });
+
+    async function loadRealBookings(userId) {
+      const { data: bookings, error } = await sb
+        .from('bookings')
+        .select('*')
+        .eq('driver_id', userId)
+        .order('created_at', { ascending: false });
+
+      if (error || !bookings || bookings.length === 0) return;
+
+      // Update stats
+      const totalSpent = bookings.reduce((sum, b) => sum + (b.total_amount || 0), 0);
+      document.querySelector('.stats-row .stat-card:nth-child(1) .stat-val').textContent = bookings.length;
+      document.querySelector('.stats-row .stat-card:nth-child(2) .stat-val').textContent = '£' + totalSpent.toFixed(2);
+
+      // Build real bookings section
+      const confirmedSection = document.getElementById('section-upcoming');
+      const completedSection = document.getElementById('section-completed');
+
+      // Clear demo data and replace with real
+      const realUpcoming = bookings.filter(b => b.status === 'confirmed' || b.status === 'pending');
+      const realCompleted = bookings.filter(b => b.status === 'completed');
+      const realCancelled = bookings.filter(b => b.status === 'cancelled');
+
+      if (realUpcoming.length > 0) {
+        const cards = realUpcoming.map(b => buildBookingCard(b, 'upcoming')).join('');
+        confirmedSection.innerHTML = `<div class="section-label">Your Bookings</div>${cards}`;
+      }
+
+      if (realCompleted.length > 0) {
+        const cards = realCompleted.map(b => buildBookingCard(b, 'completed')).join('');
+        completedSection.innerHTML = `<div class="section-label">Past Sessions</div>${cards}`;
+      }
+    }
+
+    function buildBookingCard(b, type) {
+      const date = new Date(b.booking_date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+      const badgeClass = type === 'upcoming' ? 'badge-upcoming' : 'badge-completed';
+      const badgeText = type === 'upcoming' ? 'Confirmed' : 'Completed';
+      const borderClass = type === 'upcoming' ? 'upcoming' : 'completed';
+      return `
+        <div class="booking-card ${borderClass}">
+          <div class="card-top">
+            <div class="card-host">
+              <div class="host-emoji">⚡</div>
+              <div>
+                <div class="host-info-name">Booking ${b.reference || b.id.slice(0,8)}</div>
+                <div class="host-info-sub">${date} · ${b.time_slot}</div>
+              </div>
+            </div>
+            <span class="status-badge ${badgeClass}">${badgeText}</span>
+          </div>
+          <div class="card-bottom">
+            <span class="card-ref">${b.reference || 'NC-' + b.id.slice(0,6).toUpperCase()}</span>
+            <span class="card-price">£${parseFloat(b.total_amount).toFixed(2)}</span>
+          </div>
+        </div>`;
+    }
+
+    // ── FILTER ──
+    function filterBookings(filter, btn) {
+      document.querySelectorAll('.filter-tab').forEach(t => t.classList.remove('active'));
+      btn.classList.add('active');
+
+      const banner = document.getElementById('charging-banner');
+      const upcoming = document.getElementById('section-upcoming');
+      const active = document.getElementById('section-active');
+      const completed = document.getElementById('section-completed');
+      const cancelled = document.getElementById('section-cancelled');
+      const empty = document.getElementById('empty-state');
+
+      // Reset all
+      [banner, upcoming, active, completed, cancelled].forEach(el => el.style.display = '');
+      empty.classList.remove('show');
+
+      if (filter === 'all') {
+        cancelled.style.display = 'none';
+      } else if (filter === 'upcoming') {
+        banner.style.display = 'none';
+        active.style.display = 'none';
+        completed.style.display = 'none';
+        cancelled.style.display = 'none';
+      } else if (filter === 'active') {
+        upcoming.style.display = 'none';
+        completed.style.display = 'none';
+        cancelled.style.display = 'none';
+      } else if (filter === 'completed') {
+        banner.style.display = 'none';
+        upcoming.style.display = 'none';
+        active.style.display = 'none';
+        cancelled.style.display = 'none';
+      } else if (filter === 'cancelled') {
+        banner.style.display = 'none';
+        upcoming.style.display = 'none';
+        active.style.display = 'none';
+        completed.style.display = 'none';
+        cancelled.style.display = '';
+      }
+    }
+
+    // ── MODAL DATA ──
+    const modalData = {
+      'upcoming-1': {
+        title: "Sarah's Driveway — Tomorrow",
+        rows: [
+          { k: 'Status', v: '✅ Confirmed' },
+          { k: 'Date', v: 'Wednesday 25 Feb' },
+          { k: 'Time', v: '09:00 – 10:00' },
+          { k: 'Charger', v: '7kW · Type 2' },
+          { k: 'Host', v: 'Sarah M.' },
+          { k: 'Address', v: 'Shared after arrival' },
+          { k: 'Ref', v: 'NC-A7X9K2' },
+          { k: 'Paid', v: '£0.35' },
+        ],
+        actions: [
+          { label: '🗺 Get Directions', cls: 'accent', fn: 'getDirections()' },
+          { label: '💬 Message Host', cls: '', fn: '' },
+          { label: '❌ Cancel Booking', cls: 'danger', fn: "cancelBooking('NC-A7X9K2')" },
+        ]
+      },
+      'active-1': {
+        title: 'James — Garage · Charging Now',
+        rows: [
+          { k: 'Status', v: '🔵 Charging in progress' },
+          { k: 'Started', v: '14:32 today' },
+          { k: 'Est. complete', v: '15:32 today' },
+          { k: 'Energy so far', v: '~7.1kWh' },
+          { k: 'Charger', v: '11kW · Type 2' },
+          { k: 'Ref', v: 'NC-B3M8P1' },
+          { k: 'Cost', v: '£0.24' },
+        ],
+        actions: [
+          { label: '🗺 Navigate There', cls: 'accent', fn: 'getDirections()' },
+          { label: '💬 Message Host', cls: '', fn: '' },
+        ]
+      },
+      'completed-1': {
+        title: 'Chen Family Home · 20 Feb',
+        rows: [
+          { k: 'Status', v: '✅ Completed' },
+          { k: 'Date', v: 'Thursday 20 Feb' },
+          { k: 'Time', v: '08:00 – 10:00' },
+          { k: 'Energy added', v: '38kWh' },
+          { k: 'Charger', v: '22kW · Type 2 (3-phase)' },
+          { k: 'Host', v: 'Wei C.' },
+          { k: 'Ref', v: 'NC-C5R2L9' },
+          { k: 'Total paid', v: '£0.64' },
+        ],
+        actions: [
+          { label: '⭐ Leave a Review', cls: 'accent', fn: 'closeModal()' },
+          { label: '🔄 Book Again', cls: '', fn: "window.location.href='booking.html'" },
+        ]
+      },
+      'completed-2': {
+        title: "Anita's Driveway · 18 Feb",
+        rows: [
+          { k: 'Status', v: '✅ Completed' },
+          { k: 'Date', v: 'Tuesday 18 Feb' },
+          { k: 'Time', v: '19:00 – 21:00' },
+          { k: 'Energy added', v: '14kWh' },
+          { k: 'Charger', v: '7kW · Type 2' },
+          { k: 'Host', v: 'Anita B.' },
+          { k: 'Ref', v: 'NC-D1K7N4' },
+          { k: 'Total paid', v: '£0.44' },
+        ],
+        actions: [
+          { label: '⭐ Leave a Review', cls: 'accent', fn: 'closeModal()' },
+          { label: '🔄 Book Again', cls: '', fn: "window.location.href='booking.html'" },
+        ]
+      }
+    };
+
+    // ── OPEN MODAL ──
+    function openModal(id) {
+      const data = modalData[id];
+      if (!data) return;
+
+      document.getElementById('modal-title').textContent = data.title;
+      document.getElementById('modal-rows').innerHTML = data.rows.map(r =>
+        `<div class="modal-row"><span class="k">${r.k}</span><span class="v">${r.v}</span></div>`
+      ).join('');
+      document.getElementById('modal-actions').innerHTML = data.actions.map(a =>
+        `<button class="modal-btn ${a.cls}" onclick="${a.fn || 'closeModal()'}">${a.label}</button>`
+      ).join('');
+
+      document.getElementById('modal-overlay').classList.add('show');
+      document.getElementById('modal').classList.add('open');
+    }
+
+    // ── CLOSE MODAL ──
+    function closeModal() {
+      document.getElementById('modal-overlay').classList.remove('show');
+      document.getElementById('modal').classList.remove('open');
+    }
+
+    // ── CANCEL BOOKING ──
+    function cancelBooking(ref) {
+      if (confirm(`Cancel booking ${ref}?\n\nYou will receive a full refund within 3-5 business days.`)) {
+        closeModal();
+        alert(`Booking ${ref} cancelled. Refund on its way.`);
+      }
+    }
+
+    // ── DIRECTIONS ──
+    function getDirections() {
+      window.open('https://maps.google.com?q=Sarah+Driveway+London', '_blank');
+    }
+  </script>
+
+</body>
+</html>
