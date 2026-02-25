@@ -1,4 +1,4 @@
-const CACHE_NAME = 'chargespot-v3';
+const CACHE_NAME = 'chargespot-v4';
 const OFFLINE_URL = '/index.html';
 
 const PRECACHE = [
