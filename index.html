@@ -932,12 +932,10 @@ let installPrompt = null;
 let ocmLoaded = false;
 
 // ── PWA ──
+// Unregister any stuck service workers and don't re-register
 if ('serviceWorker' in navigator) {
-  // Unregister ALL old service workers, then register fresh
   navigator.serviceWorker.getRegistrations().then(regs => {
-    Promise.all(regs.map(r => r.unregister())).then(() => {
-      navigator.serviceWorker.register('/sw.js').catch(() => {});
-    });
+    regs.forEach(r => r.unregister());
   });
 }
 window.addEventListener('beforeinstallprompt', e => {
