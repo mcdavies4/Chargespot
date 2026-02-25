@@ -1057,6 +1057,13 @@ async function checkReturnFromStripe() {
   const payment = params.get('payment');
   const ref = params.get('ref');
   const type = params.get('type');
+  const fullUrl = window.location.href;
+
+  console.log('[CS] checkReturnFromStripe fired');
+  console.log('[CS] Full URL:', fullUrl);
+  console.log('[CS] payment param:', payment);
+  console.log('[CS] ref param:', ref);
+  console.log('[CS] localStorage pending_ref:', localStorage.getItem('cs_pending_ref'));
 
   // Clear URL immediately so refresh never re-triggers this
   if (payment || ref) {
@@ -1064,9 +1071,9 @@ async function checkReturnFromStripe() {
   }
 
   if (payment === 'success' && ref) {
+    console.log('[CS] Payment SUCCESS detected — calling markPaid');
     localStorage.removeItem('cs_pending_ref');
     localStorage.removeItem('cs_pending_type');
-    // Small delay to let loadData/loadBookings start first
     await new Promise(r => setTimeout(r, 1200));
     await markPaid(ref, type);
     goTo('bookings');
@@ -1083,10 +1090,13 @@ async function checkReturnFromStripe() {
   // Fallback: check localStorage for a pending booking
   const pendingRef = localStorage.getItem('cs_pending_ref');
   const pendingType = localStorage.getItem('cs_pending_type');
+  console.log('[CS] No URL params. pendingRef in localStorage:', pendingRef);
   if (pendingRef) {
+    console.log('[CS] Starting pollForPayment');
     pollForPayment(pendingRef, pendingType);
   }
 }
+
 
 
 
@@ -1159,13 +1169,14 @@ function resolvePendingDeepLink() {
 }
 
 async function markPaid(ref, type) {
-  await sb.from('bookings').update({ status: 'paid', payment_status: 'paid', payment_type: type }).eq('ref', ref);
+  console.log('[CS] markPaid called — ref:', ref, 'type:', type);
+  const { error } = await sb.from('bookings').update({ status: 'paid', payment_status: 'paid', payment_type: type }).eq('ref', ref);
+  console.log('[CS] DB update result — error:', error);
   await loadBookings();
-  toast('Booking confirmed! ✅', `Ref ${ref} — check My Bookings`, 'green');
-  // Fire push notification
+  console.log('[CS] loadBookings done — userBookings count:', userBookings.length);
+  toast('Booking confirmed! ✅', `Ref ${ref} — see My Bookings`, 'green');
   const bk = userBookings.find(b => b.ref === ref);
   if (bk) notifyBookingConfirmed(ref, bk.chargers?.name || 'charger', bk.booking_time);
-  // Send confirmation email via Edge Function (non-blocking)
   fetch(`${SUPABASE_URL}/functions/v1/send-confirmation`, {
     method: 'POST',
     headers: {
@@ -1173,8 +1184,9 @@ async function markPaid(ref, type) {
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({ booking_ref: ref })
-  }).catch(e => console.log('Email send failed (non-critical):', e.message));
+  }).catch(e => console.log('[CS] Email send failed:', e.message));
 }
+
 
 
 // ── OCM CACHE ──
