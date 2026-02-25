@@ -1961,42 +1961,74 @@ function renderBookings() {
     </div>`;
     return;
   }
-  el.innerHTML = userBookings.map(b => `
+  el.innerHTML = userBookings.map(b => {
+    const isPaid = b.payment_status === 'paid';
+    const isCheckedIn = b.status === 'checked_in';
+    const isCancelled = b.status === 'cancelled';
+    const isRefunded = b.payment_status === 'refunded';
+    const isRefundReq = b.payment_status === 'refund_requested';
+
+    // Time calculations
+    let minsUntil = null;
+    let isUpcoming = false;
+    let isOverdue = false;
+    let timeLabel = b.booking_time || 'Session';
+    try {
+      const bt = new Date(b.booking_time);
+      minsUntil = (bt - Date.now()) / 60000;
+      isUpcoming = minsUntil > 0 && minsUntil <= 30;
+      isOverdue = minsUntil < -15;
+    } catch(e) {}
+
+    // Status pill
+    const pillClass = isCheckedIn ? 'sp-paid' : isRefundReq ? 'sp-refund' : isRefunded ? 'sp-refund' : isPaid ? 'sp-paid' : 'sp-pending';
+    const pillLabel = isCheckedIn ? '⚡ Charging' : isRefundReq ? '⚠️ Refund Req' : isRefunded ? '💚 Refunded' : isPaid ? '✅ Paid' : '⏳ Pending';
+
+    // Check-in section
+    let checkinSection = '';
+    if (isCheckedIn) {
+      checkinSection = \`
+        <div style="background:linear-gradient(135deg,#001a10,#002a18);border:1px solid var(--green);border-radius:12px;padding:14px 16px;margin-top:10px;text-align:center">
+          <div style="font-size:24px;margin-bottom:4px">⚡</div>
+          <div style="color:var(--green);font-size:14px;font-weight:700">You're checked in</div>
+          <div style="color:var(--text-dim);font-size:12px;margin-top:2px">Charging session active — enjoy!</div>
+        </div>\`;
+    } else if (isPaid && !isRefunded && !isRefundReq) {
+      const urgentWarning = isUpcoming ? \`<div style="font-size:11px;color:var(--amber);margin-top:8px;text-align:center">⏳ Arriving soon? Check in when you reach the charger</div>\` : '';
+      const overdueWarning = isOverdue ? \`<div style="font-size:11px;color:#ff4444;margin-top:8px;text-align:center">⚠️ Slot may have been released — check in to confirm</div>\` : '';
+      checkinSection = \`
+        <button id="manual-ci-\${b.id}" onclick="manualCheckIn('\${b.id}','\${b.ref}')"
+          style="width:100%;margin-top:10px;padding:14px;border-radius:12px;border:2px solid var(--green);background:linear-gradient(135deg,#001a10,#002a18);color:var(--green);font-family:'Outfit',sans-serif;font-size:14px;font-weight:800;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px">
+          <span style="font-size:18px">📍</span> I've Arrived — Check In
+        </button>
+        \${urgentWarning}\${overdueWarning}\`;
+    }
+
+    // Action buttons
+    const cancelBtn = !isCheckedIn && !isRefunded ? \`<button class="bk-cancel" style="flex:1;margin-top:0" onclick="cancelBooking('\${b.id}','\${b.slot_id||''}')">✕ Cancel</button>\` : '';
+    const refundBtn = isPaid && !isCheckedIn && !isRefunded && !isRefundReq ? \`<button class="bk-refund" style="flex:1" onclick="requestRefund('\${b.id}','\${b.ref}',this)">⚠️ Slot Occupied</button>\` : '';
+
+    return \`
     <div class="bk-card fade-up">
       <div class="bk-header">
-        <div class="bk-name">${b.chargers?.name || 'Charger'}</div>
-        <div class="bk-ref ${b.payment_status==='paid'?'paid':''}">${b.ref}</div>
+        <div class="bk-name">\${b.chargers?.name || b.charger_name || 'EV Charger'}</div>
+        <div class="bk-ref \${isPaid ? 'paid' : ''}">\${b.ref}</div>
       </div>
-      <div class="bk-addr">📍 ${b.chargers?.address || ''}</div>
+      <div class="bk-addr">📍 \${b.chargers?.address || ''}</div>
       <div class="bk-meta">
-        <span>🕐 ${b.booking_time}</span>
-        <span>⏱ ${b.duration_minutes}min</span>
-        <span>🚗 ${b.reg}</span>
-        <span class="status-pill ${
-          b.status==='checked_in'?'sp-paid':
-          b.payment_status==='refund_requested'?'sp-refund':
-          b.payment_status==='refunded'?'sp-refund':
-          b.payment_status==='paid'?'sp-paid':
-          b.status==='pending_payment'?'sp-pending':'sp-pending'}">${
-          b.status==='checked_in'?'✅ Checked In':
-          b.payment_status==='refund_requested'?'⚠️ Refund Req':
-          b.payment_status==='refunded'?'💚 Refunded':
-          b.payment_status==='paid'?'✅ Paid':'⏳ Pending'}</span>
+        <span>🕐 \${timeLabel}</span>
+        <span>⏱ \${b.duration_minutes}min</span>
+        <span>🚗 \${b.reg}</span>
+        <span class="status-pill \${pillClass}">\${pillLabel}</span>
       </div>
-      ${b.status === 'checked_in' ? `<div style="font-size:12px;color:var(--green);font-weight:700;margin-top:6px">✅ Checked in — you're confirmed at the charger</div>` : ''}
-      ${b.payment_status==='paid' && b.status!=='checked_in' ? `
-        <button id="manual-ci-${b.id}" onclick="manualCheckIn('${b.id}','${b.ref}')"
-          style="width:100%;margin-top:10px;padding:12px;border-radius:10px;border:2px solid var(--green);background:linear-gradient(135deg,#001a10,#002a18);color:var(--green);font-family:'Outfit',sans-serif;font-size:13px;font-weight:700;cursor:pointer">
-          📍 I've Arrived — Check In
-        </button>
-        ${(()=>{ try { const bt=new Date(b.booking_time); const minsUntil=(bt-Date.now())/60000; return minsUntil<20&&minsUntil>-15; } catch(e){return false;} })() ? '<div style="font-size:11px;color:var(--amber);margin-top:5px;text-align:center">⏳ Check in within 15 mins or scan QR at charger — slot auto-releases if not</div>' : ''}
-      ` : ''}
+      \${checkinSection}
       <div style="display:flex;gap:8px;margin-top:10px">
-        <button class="bk-cancel" style="flex:1;margin-top:0" onclick="cancelBooking('${b.id}','${b.slot_id||''}')">✕ Cancel</button>
-        ${b.payment_status==='paid' ? `<button class="bk-refund" style="flex:1" onclick="requestRefund('${b.id}','${b.ref}',this)">⚠️ Slot Occupied</button>` : ''}
+        \${cancelBtn}
+        \${refundBtn}
       </div>
-      <div class="refund-sent" id="rs-${b.id}">✅ Refund request sent — we'll process within 24hrs</div>
-    </div>`).join('');
+      <div class="refund-sent" id="rs-\${b.id}">✅ Refund request sent — we'll process within 24hrs</div>
+    </div>\`;
+  }).join('');
 }
 
 async function cancelBooking(id, slotId) {
@@ -2328,57 +2360,58 @@ function distanceMetres(lat1, lng1, lat2, lng2) {
 }
 
 async function checkInBooking(bookingId, ref, method) {
-  // Try with checked_in_at first (requires SQL migration), fall back without it
+  const now = new Date().toISOString();
   let { error } = await sb.from('bookings')
-    .update({ status: 'checked_in', checked_in_at: new Date().toISOString() })
-    .eq('id', bookingId);
+    .update({ status: 'checked_in', checked_in_at: now })
+    .eq('id', bookingId)
+    .eq('user_id', currentUser.id);
   if (error && error.message?.includes('checked_in_at')) {
-    // Column doesn't exist yet — update without it
-    const res = await sb.from('bookings').update({ status: 'checked_in' }).eq('id', bookingId);
+    const res = await sb.from('bookings')
+      .update({ status: 'checked_in' })
+      .eq('id', bookingId)
+      .eq('user_id', currentUser.id);
     error = res.error;
   }
-  if (error) return false;
-  // Update local state immediately
+  if (error) {
+    console.error('Check-in error:', error);
+    toast('Check-in failed', error.message, 'amber');
+    return false;
+  }
   const bk = userBookings.find(b => b.id === bookingId);
   if (bk) bk.status = 'checked_in';
   renderBookings();
-  toast('Checked in! ✅', `${ref} — you're confirmed at the charger`, 'green');
+  toast('Checked in! ⚡', 'Charging session started — enjoy!', 'green');
   return true;
 }
 
-async function gpsAutoCheckIn() {
-  if (!currentUser || !userBookings.length) return;
-  const eligible = userBookings.filter(b =>
-    b.payment_status === 'paid' &&
-    b.status !== 'checked_in' &&
-    b.status !== 'cancelled' &&
-    b.status !== 'expired' &&
-    b.charger_lat && b.charger_lng
-  );
-  if (!eligible.length) return;
-  if (!navigator.geolocation) return;
-
-  navigator.geolocation.getCurrentPosition(async pos => {
-    const { latitude, longitude } = pos.coords;
-    for (const b of eligible) {
-      const dist = distanceMetres(latitude, longitude, b.charger_lat, b.charger_lng);
-      if (dist <= 150) { // within 150 metres
-        const ok = await checkInBooking(b.id, b.ref, 'gps');
-        if (ok) toast('Auto checked in 📍', `GPS confirmed you at ${b.chargers?.name || 'the charger'}`, 'green');
-      }
-    }
-  }, () => {}, { enableHighAccuracy: true, timeout: 8000, maximumAge: 30000 });
-}
-
-// Run GPS check-in every 90 seconds when bookings screen is active
-setInterval(() => { if (currentUser && document.getElementById('screen-bookings')?.classList.contains('active')) gpsAutoCheckIn(); }, 90000);
-
 async function manualCheckIn(bookingId, ref) {
   const btn = document.getElementById('manual-ci-' + bookingId);
-  if (btn) { btn.disabled = true; btn.textContent = 'Checking in...'; }
-  const ok = await checkInBooking(bookingId, ref, 'manual');
-  if (!ok && btn) { btn.disabled = false; btn.textContent = "📍 I've Arrived"; }
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ Checking in...'; }
+
+  // Try GPS first to confirm they're near the charger
+  if (navigator.geolocation) {
+    const bk = userBookings.find(b => b.id === bookingId);
+    if (bk?.charger_lat && bk?.charger_lng) {
+      navigator.geolocation.getCurrentPosition(async pos => {
+        const dist = distanceMetres(pos.coords.latitude, pos.coords.longitude, bk.charger_lat, bk.charger_lng);
+        if (dist > 500) {
+          if (!confirm(`You appear to be ${Math.round(dist)}m from the charger. Check in anyway?`)) {
+            if (btn) { btn.disabled = false; btn.textContent = "📍 I've Arrived — Check In"; }
+            return;
+          }
+        }
+        await checkInBooking(bookingId, ref, 'manual');
+      }, async () => {
+        // GPS failed — check in anyway
+        await checkInBooking(bookingId, ref, 'manual');
+      }, { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 });
+      return;
+    }
+  }
+  // No GPS or no charger coords — just check in
+  await checkInBooking(bookingId, ref, 'manual');
 }
+
 
 function scheduleBookingReminders() {
   scheduleAllReminders();
