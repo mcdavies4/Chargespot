@@ -1169,12 +1169,17 @@ function resolvePendingDeepLink() {
 }
 
 async function markPaid(ref, type) {
-  console.log('[CS] markPaid called — ref:', ref, 'type:', type);
-  const { error } = await sb.from('bookings').update({ status: 'paid', payment_status: 'paid', payment_type: type }).eq('ref', ref);
-  console.log('[CS] DB update result — error:', error);
+  console.log('[CS] markPaid called — ref:', ref, 'type:', type, 'user:', currentUser?.id);
+  // Filter by both ref AND user_id to satisfy RLS policies
+  const { data, error } = await sb.from('bookings')
+    .update({ status: 'paid', payment_status: 'paid', payment_type: type })
+    .eq('ref', ref)
+    .eq('user_id', currentUser.id)
+    .select();
+  console.log('[CS] DB update result — error:', error, 'rows updated:', data?.length);
   await loadBookings();
   console.log('[CS] loadBookings done — userBookings count:', userBookings.length);
-  toast('Booking confirmed! ✅', `Ref ${ref} — see My Bookings`, 'green');
+  toast('Booking confirmed! ✅', `Ref ${ref} — see My Bookings below`, 'green');
   const bk = userBookings.find(b => b.ref === ref);
   if (bk) notifyBookingConfirmed(ref, bk.chargers?.name || 'charger', bk.booking_time);
   fetch(`${SUPABASE_URL}/functions/v1/send-confirmation`, {
@@ -1186,6 +1191,7 @@ async function markPaid(ref, type) {
     body: JSON.stringify({ booking_ref: ref })
   }).catch(e => console.log('[CS] Email send failed:', e.message));
 }
+
 
 
 
