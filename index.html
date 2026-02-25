@@ -936,28 +936,30 @@ function hideSplash() {
   if (splash) { splash.classList.add('hide'); setTimeout(() => splash.style.display = 'none', 400); }
 }
 
-async function bootApp(session) {
+function bootApp(session) {
   if (appReady) return;
   appReady = true;
-  hideSplash();
   currentUser = session?.user || null;
   const nav = document.getElementById('bottom-nav');
   if (currentUser) {
+    // Show home immediately so splash clears — don't block on anything async
+    showScreen('home');
+    hideSplash();
     nav.classList.add('show');
     setGreeting();
-    // Check for Stripe return FIRST and await it — before showing any screen
-    // This ensures markPaid completes and bookings load before we navigate
-    const didReturn = await checkReturnFromStripe();
-    if (!didReturn) showScreen('home');
+    updateNotifLabel();
+    // Handle Stripe return in background — will navigate to bookings if needed
+    checkReturnFromStripe();
     loadData();
     checkForChargerDeepLink();
     setupRealtime();
-    updateNotifLabel();
   } else {
     showScreen('auth');
+    hideSplash();
     nav.classList.remove('show');
   }
 }
+
 
 
 // onAuthStateChange fires first with INITIAL_SESSION — use this as the boot signal
@@ -975,8 +977,7 @@ sb.auth.onAuthStateChange((event, session) => {
     showScreen('home');
     nav.classList.add('show');
     setGreeting();
-    const didReturn2 = await checkReturnFromStripe();
-    if (!didReturn2) showScreen('home');
+    checkReturnFromStripe();
     loadData();
     checkForChargerDeepLink();
     setupRealtime();
@@ -1065,17 +1066,18 @@ async function checkReturnFromStripe() {
   if (payment === 'success' && ref) {
     localStorage.removeItem('cs_pending_ref');
     localStorage.removeItem('cs_pending_type');
-    // Await markPaid so DB is updated and bookings loaded before navigating
+    // Small delay to let loadData/loadBookings start first
+    await new Promise(r => setTimeout(r, 1200));
     await markPaid(ref, type);
     goTo('bookings');
-    return true; // tells bootApp not to show home screen
+    return;
   }
 
   if (payment === 'cancelled') {
     localStorage.removeItem('cs_pending_ref');
     localStorage.removeItem('cs_pending_type');
     toast('Payment cancelled', 'No charge was made', 'amber');
-    return false;
+    return;
   }
 
   // Fallback: check localStorage for a pending booking
@@ -1084,9 +1086,8 @@ async function checkReturnFromStripe() {
   if (pendingRef) {
     pollForPayment(pendingRef, pendingType);
   }
-
-  return false;
 }
+
 
 
 async function pollForPayment(ref, type) {
