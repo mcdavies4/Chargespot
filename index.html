@@ -2037,85 +2037,57 @@ function renderPastBookings() {
 
 
 function renderBookings() {
-  const el = document.getElementById('bk-list');
+  var el = document.getElementById('bk-list');
   if (!userBookings.length) {
-    el.innerHTML = `<div style="text-align:center;padding:60px 24px;color:var(--text-dim)">
-      <div style="font-size:48px;margin-bottom:16px">📋</div>
-      <div style="font-size:16px;font-weight:700;color:var(--text);margin-bottom:8px">No bookings yet</div>
-      <div style="font-size:13px;margin-bottom:20px">Find a charger and book your slot</div>
-      <button onclick="goTo('chargers')" style="background:linear-gradient(135deg,var(--accent),var(--accent2));color:#000;border:none;border-radius:12px;padding:13px 28px;font-family:'Outfit',sans-serif;font-size:14px;font-weight:700;cursor:pointer">Browse Chargers →</button>
-      <br><button onclick="loadBookings()" style="margin-top:12px;background:transparent;border:1px solid rgba(255,255,255,0.2);border-radius:12px;padding:10px 24px;color:var(--text-dim);font-size:13px;cursor:pointer;font-family:'Outfit',sans-serif">↻ Refresh bookings</button>
-    </div>`;
+    el.innerHTML = '<div style="text-align:center;padding:60px 24px"><div style="font-size:48px">📋</div><div style="font-size:16px;font-weight:700;color:var(--text);margin:12px 0 8px">No bookings yet</div><div style="font-size:13px;color:var(--text-dim);margin-bottom:20px">Find a charger and book your slot</div><button onclick="goTo(\'chargers\')" class="cta-btn" style="margin-bottom:10px">Browse Chargers</button><br><button onclick="loadBookings()" style="margin-top:10px;background:transparent;border:1px solid rgba(255,255,255,0.2);border-radius:12px;padding:10px 24px;color:var(--text-dim);font-size:13px;cursor:pointer">↻ Refresh</button></div>';
     return;
   }
-  el.innerHTML = userBookings.map(b => {
-    const isPaid = b.payment_status === 'paid';
-    const isCheckedIn = b.status === 'checked_in';
-    const isCancelled = b.status === 'cancelled';
-    const isRefunded = b.payment_status === 'refunded';
-    const isRefundReq = b.payment_status === 'refund_requested';
+  el.innerHTML = '';
+  userBookings.forEach(function(b) {
+    var isPaid = b.payment_status === 'paid';
+    var isCheckedIn = b.status === 'checked_in';
+    var isRefunded = b.payment_status === 'refunded';
+    var isRefundReq = b.payment_status === 'refund_requested';
+    var chargerName = (b.chargers && b.chargers.name) ? b.chargers.name : (b.charger_name || 'EV Charger');
+    var chargerAddr = (b.chargers && b.chargers.address) ? b.chargers.address : '';
+    var isUpcoming = false, isOverdue = false;
+    try { var m=(new Date(b.booking_time)-Date.now())/60000; isUpcoming=m>0&&m<=30; isOverdue=m<-15; } catch(e) {}
+    var pillClass = isCheckedIn?'sp-paid':isRefundReq?'sp-refund':isRefunded?'sp-refund':isPaid?'sp-paid':'sp-pending';
+    var pillLabel = isCheckedIn?'⚡ Charging':isRefundReq?'⚠️ Refund Req':isRefunded?'💚 Refunded':isPaid?'✅ Paid':'⏳ Pending';
 
-    // Time calculations
-    let minsUntil = null;
-    let isUpcoming = false;
-    let isOverdue = false;
-    let timeLabel = b.booking_time || 'Session';
-    try {
-      const bt = new Date(b.booking_time);
-      minsUntil = (bt - Date.now()) / 60000;
-      isUpcoming = minsUntil > 0 && minsUntil <= 30;
-      isOverdue = minsUntil < -15;
-    } catch(e) {}
+    var card = document.createElement('div');
+    card.className = 'bk-card fade-up';
 
-    // Status pill
-    const pillClass = isCheckedIn ? 'sp-paid' : isRefundReq ? 'sp-refund' : isRefunded ? 'sp-refund' : isPaid ? 'sp-paid' : 'sp-pending';
-    const pillLabel = isCheckedIn ? '⚡ Charging' : isRefundReq ? '⚠️ Refund Req' : isRefunded ? '💚 Refunded' : isPaid ? '✅ Paid' : '⏳ Pending';
+    var inner = '<div class="bk-header"><div class="bk-name">'+chargerName+'</div><div class="bk-ref'+(isPaid?' paid':'')+'">'+b.ref+'</div></div>';
+    inner += '<div class="bk-addr">📍 '+chargerAddr+'</div>';
+    inner += '<div class="bk-meta"><span>🕐 '+(b.booking_time||'Session')+'</span><span>⏱ '+b.duration_minutes+'min</span><span>🚗 '+(b.reg||'')+'</span><span class="status-pill '+pillClass+'">'+pillLabel+'</span></div>';
 
-    // Check-in section
-    let checkinSection = '';
     if (isCheckedIn) {
-      checkinSection = \`
-        <div style="background:linear-gradient(135deg,#001a10,#002a18);border:1px solid var(--green);border-radius:12px;padding:14px 16px;margin-top:10px;text-align:center">
-          <div style="font-size:24px;margin-bottom:4px">⚡</div>
-          <div style="color:var(--green);font-size:14px;font-weight:700">You're checked in</div>
-          <div style="color:var(--text-dim);font-size:12px;margin-top:2px">Charging session active — enjoy!</div>
-        </div>\`;
+      inner += '<div style="background:linear-gradient(135deg,#001a10,#002a18);border:1px solid var(--green);border-radius:12px;padding:14px;margin-top:10px;text-align:center"><div style="font-size:22px">⚡</div><div style="color:var(--green);font-weight:700">You are checked in</div><div style="color:var(--text-dim);font-size:12px;margin-top:2px">Charging session active</div></div>';
     } else if (isPaid && !isRefunded && !isRefundReq) {
-      const urgentWarning = isUpcoming ? \`<div style="font-size:11px;color:var(--amber);margin-top:8px;text-align:center">⏳ Arriving soon? Check in when you reach the charger</div>\` : '';
-      const overdueWarning = isOverdue ? \`<div style="font-size:11px;color:#ff4444;margin-top:8px;text-align:center">⚠️ Slot may have been released — check in to confirm</div>\` : '';
-      checkinSection = \`
-        <button id="manual-ci-\${b.id}" onclick="manualCheckIn('\${b.id}','\${b.ref}')"
-          style="width:100%;margin-top:10px;padding:14px;border-radius:12px;border:2px solid var(--green);background:linear-gradient(135deg,#001a10,#002a18);color:var(--green);font-family:'Outfit',sans-serif;font-size:14px;font-weight:800;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px">
-          <span style="font-size:18px">📍</span> I've Arrived — Check In
-        </button>
-        \${urgentWarning}\${overdueWarning}\`;
+      inner += '<button class="checkin-btn" data-id="'+b.id+'" data-ref="'+b.ref+'" style="width:100%;margin-top:10px;padding:14px;border-radius:12px;border:2px solid var(--green);background:linear-gradient(135deg,#001a10,#002a18);color:var(--green);font-size:14px;font-weight:800;cursor:pointer">📍 I have Arrived — Check In</button>';
+      if (isUpcoming) inner += '<div style="font-size:11px;color:var(--amber);margin-top:8px;text-align:center">⏳ Arriving soon? Check in when you reach the charger</div>';
+      if (isOverdue) inner += '<div style="font-size:11px;color:#ff4444;margin-top:8px;text-align:center">⚠️ Slot may have been released — check in to confirm</div>';
     }
 
-    // Action buttons
-    const cancelBtn = !isCheckedIn && !isRefunded ? \`<button class="bk-cancel" style="flex:1;margin-top:0" onclick="cancelBooking('\${b.id}','\${b.slot_id||''}')">✕ Cancel</button>\` : '';
-    const refundBtn = isPaid && !isCheckedIn && !isRefunded && !isRefundReq ? \`<button class="bk-refund" style="flex:1" onclick="requestRefund('\${b.id}','\${b.ref}',this)">⚠️ Slot Occupied</button>\` : '';
+    inner += '<div style="display:flex;gap:8px;margin-top:10px">';
+    if (!isCheckedIn && !isRefunded) inner += '<button class="bk-cancel cancel-btn" data-id="'+b.id+'" data-slot="'+(b.slot_id||'')+'" style="flex:1;margin-top:0">✕ Cancel</button>';
+    if (isPaid && !isCheckedIn && !isRefunded && !isRefundReq) inner += '<button class="bk-refund refund-btn" data-id="'+b.id+'" data-ref="'+b.ref+'" style="flex:1">⚠️ Slot Occupied</button>';
+    inner += '</div>';
+    inner += '<div class="refund-sent" id="rs-'+b.id+'">✅ Refund request sent — we will process within 24hrs</div>';
 
-    return \`
-    <div class="bk-card fade-up">
-      <div class="bk-header">
-        <div class="bk-name">\${b.chargers?.name || b.charger_name || 'EV Charger'}</div>
-        <div class="bk-ref \${isPaid ? 'paid' : ''}">\${b.ref}</div>
-      </div>
-      <div class="bk-addr">📍 \${b.chargers?.address || ''}</div>
-      <div class="bk-meta">
-        <span>🕐 \${timeLabel}</span>
-        <span>⏱ \${b.duration_minutes}min</span>
-        <span>🚗 \${b.reg}</span>
-        <span class="status-pill \${pillClass}">\${pillLabel}</span>
-      </div>
-      \${checkinSection}
-      <div style="display:flex;gap:8px;margin-top:10px">
-        \${cancelBtn}
-        \${refundBtn}
-      </div>
-      <div class="refund-sent" id="rs-\${b.id}">✅ Refund request sent — we'll process within 24hrs</div>
-    </div>\`;
-  }).join('');
+    card.innerHTML = inner;
+
+    // Attach event listeners using data attributes — no inline quote issues
+    var ciBtn = card.querySelector('.checkin-btn');
+    if (ciBtn) ciBtn.addEventListener('click', function() { manualCheckIn(this.dataset.id, this.dataset.ref); });
+    var cancelBtn = card.querySelector('.cancel-btn');
+    if (cancelBtn) cancelBtn.addEventListener('click', function() { cancelBooking(this.dataset.id, this.dataset.slot); });
+    var refundBtn = card.querySelector('.refund-btn');
+    if (refundBtn) refundBtn.addEventListener('click', function() { requestRefund(this.dataset.id, this.dataset.ref, this); });
+
+    el.appendChild(card);
+  });
 }
 
 async function cancelBooking(id, slotId) {
@@ -2499,7 +2471,7 @@ async function manualCheckIn(bookingId, ref) {
         const dist = distanceMetres(pos.coords.latitude, pos.coords.longitude, bk.charger_lat, bk.charger_lng);
         if (dist > 500) {
           if (!confirm(`You appear to be ${Math.round(dist)}m from the charger. Check in anyway?`)) {
-            if (btn) { btn.disabled = false; btn.textContent = "📍 I've Arrived — Check In"; }
+            if (btn) { btn.disabled = false; btn.textContent = "📍 I&#39;ve Arrived — Check In"; }
             return;
           }
         }
