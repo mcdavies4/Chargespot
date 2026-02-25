@@ -900,7 +900,14 @@ const STRIPE_LINKS = {
 const APP_URL = window.location.origin;
 
 const { createClient } = supabase;
-const sb = createClient(SUPABASE_URL, SUPABASE_KEY);
+const sb = createClient(SUPABASE_URL, SUPABASE_KEY, {
+  auth: {
+    persistSession: true,
+    autoRefreshToken: true,
+    detectSessionInUrl: true,
+    storage: window.localStorage,
+  }
+});
 
 // ── STATE ──
 let currentUser = null;
@@ -1071,10 +1078,16 @@ async function checkReturnFromStripe() {
   }
 
   if (payment === 'success' && ref) {
-    console.log('[CS] Payment SUCCESS detected — calling markPaid');
+    console.log('[CS] Payment SUCCESS detected');
     localStorage.removeItem('cs_pending_ref');
     localStorage.removeItem('cs_pending_type');
-    await new Promise(r => setTimeout(r, 1200));
+    // Wait for auth session to restore after Stripe redirect (up to 5 seconds)
+    let waited = 0;
+    while (!currentUser && waited < 5000) {
+      await new Promise(r => setTimeout(r, 300));
+      waited += 300;
+    }
+    console.log('[CS] Auth ready after', waited, 'ms — user:', currentUser?.id);
     await markPaid(ref, type);
     goTo('bookings');
     return;
@@ -1904,17 +1917,37 @@ async function doPayment() {
 
 // ── BOOKINGS ──
 async function loadBookings() {
-  if (!currentUser) return;
-  const { data } = await sb.from('bookings')
+  if (!currentUser) {
+    // Wait up to 5s for auth to restore
+    let waited = 0;
+    while (!currentUser && waited < 5000) {
+      await new Promise(r => setTimeout(r, 300));
+      waited += 300;
+    }
+    if (!currentUser) {
+      console.log('[CS] loadBookings: no currentUser after wait, aborting');
+      return;
+    }
+  }
+  // Get fresh session token to ensure RLS works
+  const { data: { session } } = await sb.auth.getSession();
+  if (!session) {
+    console.log('[CS] loadBookings: no session, aborting');
+    return;
+  }
+  const { data, error } = await sb.from('bookings')
     .select('*, chargers(name,address)')
     .eq('user_id', currentUser.id)
     .not('status', 'eq', 'cancelled')
     .order('created_at', { ascending: false });
+  console.log('[CS] loadBookings — rows:', data?.length, 'error:', error?.message, 'uid:', currentUser.id);
   userBookings = data || [];
   renderBookings();
   document.getElementById('bk-count-lbl').textContent = userBookings.length ? `${userBookings.length} active` : 'No bookings yet';
   scheduleBookingReminders();
 }
+
+
 
 function renderBookings() {
   const el = document.getElementById('bk-list');
@@ -1924,6 +1957,7 @@ function renderBookings() {
       <div style="font-size:16px;font-weight:700;color:var(--text);margin-bottom:8px">No bookings yet</div>
       <div style="font-size:13px;margin-bottom:20px">Find a charger and book your slot</div>
       <button onclick="goTo('chargers')" style="background:linear-gradient(135deg,var(--accent),var(--accent2));color:#000;border:none;border-radius:12px;padding:13px 28px;font-family:'Outfit',sans-serif;font-size:14px;font-weight:700;cursor:pointer">Browse Chargers →</button>
+      <br><button onclick="loadBookings()" style="margin-top:12px;background:transparent;border:1px solid rgba(255,255,255,0.2);border-radius:12px;padding:10px 24px;color:var(--text-dim);font-size:13px;cursor:pointer;font-family:'Outfit',sans-serif">↻ Refresh bookings</button>
     </div>`;
     return;
   }
