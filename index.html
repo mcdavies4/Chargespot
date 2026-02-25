@@ -985,11 +985,16 @@ function bootApp(session) {
 
 
 
-// onAuthStateChange fires first with INITIAL_SESSION — use this as the boot signal
+// Boot immediately using getSession() — don't wait for onAuthStateChange which can hang
+sb.auth.getSession().then(({ data: { session } }) => {
+  bootApp(session);
+}).catch(() => bootApp(null));
+
+// Still listen for sign in/out events after boot
 sb.auth.onAuthStateChange((event, session) => {
   if (event === 'INITIAL_SESSION') {
-    // This is the reliable first event — boot from here
-    bootApp(session);
+    // Already handled by getSession above
+    return;
   } else if (event === 'SIGNED_IN') {
     // User just logged in — only run if bootApp hasn't already handled this session
     if (appReady && currentUser?.id === session?.user?.id) return; // already booted with same user
