@@ -1845,17 +1845,34 @@ async function doPayment() {
 
   if (error) { btn.disabled=false; btn.textContent='🔒 Pay with Stripe'; return toast('Error saving booking', error.message, 'amber'); }
 
-  sessionStorage.setItem('cs_booking', JSON.stringify({ ref, name, reg, time: selectedTime, charger: selectedCharger.name.split('—')[0].trim() }));
 
-  const stripeUrl = new URL(STRIPE_LINKS[payType]);
-  stripeUrl.searchParams.set('client_reference_id', ref);
-  if (currentUser?.email) stripeUrl.searchParams.set('prefilled_email', currentUser.email);
-  // Store ref in localStorage so we can recover it when Stripe redirects back
+  // Save pending ref as safety net in case redirect loses it
   localStorage.setItem('cs_pending_ref', ref);
   localStorage.setItem('cs_pending_type', payType);
+  btn.textContent = 'Opening Stripe...';
 
-  closePaySheet();
-  window.location.href = stripeUrl.toString();
+  // Create a proper Stripe Checkout Session via edge function
+  // This gives us a real success_url so the app is notified when payment completes
+  try {
+    const res = await fetch(`${SUPABASE_URL}/functions/v1/create-checkout`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${SUPABASE_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ ref, payType, email: currentUser?.email }),
+    });
+    const data = await res.json();
+    if (!res.ok || !data.url) throw new Error(data.error || 'Could not start payment');
+    closePaySheet();
+    window.location.href = data.url;
+  } catch (e) {
+    btn.disabled = false;
+    btn.textContent = 'Pay with Stripe';
+    localStorage.removeItem('cs_pending_ref');
+    localStorage.removeItem('cs_pending_type');
+    toast('Payment error', e.message, 'amber');
+  }
 }
 
 // ── BOOKINGS ──
