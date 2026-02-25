@@ -1047,34 +1047,37 @@ function setGreeting() {
 }
 
 // ── CHECK STRIPE RETURN ──
-function checkReturnFromStripe() {
+async function checkReturnFromStripe() {
   const params = new URLSearchParams(window.location.search);
   const payment = params.get('payment');
   const ref = params.get('ref');
+  const type = params.get('type');
 
-  // Path 1: Stripe redirected back with URL params (ideal)
+  // Clear URL params immediately so refresh doesn't re-trigger this
+  if (payment || ref) {
+    window.history.replaceState({}, '', APP_URL);
+  }
+
   if (payment === 'success' && ref) {
-    toast('Payment confirmed!', `Booking ${ref} is active`, 'green');
-    markPaid(ref, params.get('type'));
     localStorage.removeItem('cs_pending_ref');
     localStorage.removeItem('cs_pending_type');
-    window.history.replaceState({}, '', APP_URL);
-    return;
-  }
-  if (payment === 'cancelled') {
-    toast('Payment cancelled', 'No charge was made', 'amber');
-    localStorage.removeItem('cs_pending_ref');
-    localStorage.removeItem('cs_pending_type');
-    window.history.replaceState({}, '', APP_URL);
+    // Mark paid in DB, load bookings, navigate to bookings tab
+    await markPaid(ref, type);
+    goTo('bookings');
     return;
   }
 
-  // Path 2: No URL params — check if we have a pending booking in localStorage
-  // This happens when Stripe Payment Link doesn't redirect back with params
+  if (payment === 'cancelled') {
+    localStorage.removeItem('cs_pending_ref');
+    localStorage.removeItem('cs_pending_type');
+    toast('Payment cancelled', 'No charge was made', 'amber');
+    return;
+  }
+
+  // Fallback: check localStorage for a pending booking (e.g. if redirect lost params)
   const pendingRef = localStorage.getItem('cs_pending_ref');
   const pendingType = localStorage.getItem('cs_pending_type');
   if (pendingRef) {
-    // Poll the DB to see if this booking was paid (Stripe webhook may have updated it)
     pollForPayment(pendingRef, pendingType);
   }
 }
@@ -1150,23 +1153,21 @@ function resolvePendingDeepLink() {
 async function markPaid(ref, type) {
   await sb.from('bookings').update({ status: 'paid', payment_status: 'paid', payment_type: type }).eq('ref', ref);
   await loadBookings();
+  toast('Booking confirmed! ✅', `Ref ${ref} — check My Bookings`, 'green');
   // Fire push notification
   const bk = userBookings.find(b => b.ref === ref);
   if (bk) notifyBookingConfirmed(ref, bk.chargers?.name || 'charger', bk.booking_time);
-  // Send confirmation email via Edge Function
-  try {
-    await fetch(`${SUPABASE_URL}/functions/v1/send-confirmation`, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${SUPABASE_KEY}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ booking_ref: ref })
-    });
-  } catch(e) {
-    console.log('Email send failed (non-critical):', e.message);
-  }
+  // Send confirmation email via Edge Function (non-blocking)
+  fetch(`${SUPABASE_URL}/functions/v1/send-confirmation`, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${SUPABASE_KEY}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ booking_ref: ref })
+  }).catch(e => console.log('Email send failed (non-critical):', e.message));
 }
+
 
 // ── OCM CACHE ──
 // Cache fetched areas so revisiting doesn't re-fetch
