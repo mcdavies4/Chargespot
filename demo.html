@@ -1,0 +1,459 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#0a0f1e" />
+  <title>NestCharge — Demo Guide</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@600;700;800&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg: #070c1a; --bg2: #0d1428; --surface: #111827; --surface2: #1a2236;
+      --border: rgba(255,255,255,0.07); --accent: #00e5a0; --accent2: #0af;
+      --text: #f0f4ff; --muted: #8892a4;
+      --font-head: 'Syne', sans-serif; --font-body: 'DM Sans', sans-serif;
+    }
+    html { scroll-behavior: smooth; overflow-x: hidden; }
+    body { background: var(--bg); color: var(--text); font-family: var(--font-body); font-weight: 300; line-height: 1.7; }
+
+    /* NAV */
+    .topnav {
+      position: sticky; top: 0; z-index: 100;
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 1rem 1.5rem;
+      background: rgba(7,12,26,0.95); backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--border);
+    }
+    .logo { font-family: var(--font-head); font-size: 1.1rem; font-weight: 800; }
+    .logo span { color: var(--accent); }
+    .nav-cta {
+      background: var(--accent); color: #000; border: none;
+      padding: 0.5rem 1.1rem; border-radius: 100px;
+      font-size: 0.82rem; font-weight: 500; text-decoration: none;
+    }
+
+    /* HERO */
+    .hero {
+      padding: 4rem 1.5rem 3rem; text-align: center;
+      max-width: 680px; margin: 0 auto;
+    }
+    .hero-tag {
+      display: inline-flex; align-items: center; gap: 0.4rem;
+      background: rgba(0,229,160,0.1); border: 1px solid rgba(0,229,160,0.2);
+      color: var(--accent); padding: 0.3rem 0.9rem; border-radius: 100px;
+      font-size: 0.75rem; font-weight: 500; letter-spacing: 0.05em;
+      text-transform: uppercase; margin-bottom: 1.25rem;
+    }
+    .hero h1 {
+      font-family: var(--font-head); font-size: clamp(1.8rem, 5vw, 3rem);
+      font-weight: 800; letter-spacing: -0.02em; margin-bottom: 0.875rem;
+    }
+    .hero p { color: var(--muted); font-size: 0.95rem; margin-bottom: 2rem; }
+
+    .time-badges { display: flex; gap: 0.75rem; justify-content: center; flex-wrap: wrap; margin-bottom: 2rem; }
+    .time-badge {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 100px; padding: 0.35rem 0.875rem;
+      font-size: 0.78rem; color: var(--muted);
+    }
+    .time-badge strong { color: var(--text); }
+
+    /* MAIN */
+    .main { max-width: 760px; margin: 0 auto; padding: 0 1.25rem 4rem; }
+
+    /* AUDIENCE TABS */
+    .audience-tabs {
+      display: flex; background: var(--surface);
+      border: 1px solid var(--border); border-radius: 100px;
+      padding: 4px; margin-bottom: 2.5rem;
+    }
+    .aud-tab {
+      flex: 1; padding: 0.6rem; border-radius: 100px;
+      font-size: 0.88rem; font-weight: 500; cursor: pointer;
+      border: none; background: transparent; color: var(--muted);
+      transition: all 0.2s; text-align: center;
+    }
+    .aud-tab.active { background: var(--accent); color: #000; }
+
+    /* FLOW SECTIONS */
+    .flow { display: none; }
+    .flow.active { display: block; }
+
+    /* STEP CARD */
+    .step-card {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 1.5rem; padding: 1.5rem; margin-bottom: 1rem;
+      position: relative; overflow: hidden;
+      transition: border-color 0.25s;
+    }
+    .step-card:hover { border-color: rgba(0,229,160,0.2); }
+    .step-card::before {
+      content: ''; position: absolute;
+      left: 0; top: 0; bottom: 0; width: 3px;
+      background: var(--accent); border-radius: 3px 0 0 3px;
+    }
+
+    .step-header { display: flex; align-items: flex-start; gap: 1rem; margin-bottom: 1rem; }
+    .step-num {
+      width: 36px; height: 36px; min-width: 36px; border-radius: 50%;
+      background: rgba(0,229,160,0.1); border: 1px solid rgba(0,229,160,0.25);
+      color: var(--accent); font-family: var(--font-head); font-weight: 800;
+      font-size: 0.9rem; display: flex; align-items: center; justify-content: center;
+    }
+    .step-title { font-family: var(--font-head); font-size: 1rem; font-weight: 700; margin-bottom: 0.2rem; }
+    .step-url {
+      display: inline-flex; align-items: center; gap: 0.3rem;
+      background: var(--surface2); border: 1px solid var(--border);
+      border-radius: 100px; padding: 0.2rem 0.6rem;
+      font-size: 0.72rem; color: var(--accent); font-family: monospace;
+      text-decoration: none; margin-bottom: 0.75rem;
+    }
+    .step-desc { font-size: 0.85rem; color: var(--muted); margin-bottom: 1rem; line-height: 1.65; }
+
+    .talking-points { list-style: none; display: flex; flex-direction: column; gap: 0.4rem; }
+    .talking-points li {
+      display: flex; align-items: flex-start; gap: 0.6rem;
+      font-size: 0.82rem; color: var(--text);
+    }
+    .talking-points li::before { content: '→'; color: var(--accent); flex-shrink: 0; margin-top: 0.05rem; }
+
+    .tip-box {
+      background: rgba(0,170,255,0.06); border: 1px solid rgba(0,170,255,0.15);
+      border-radius: 0.875rem; padding: 0.875rem 1rem; margin-top: 0.875rem;
+      font-size: 0.78rem; color: var(--accent2); line-height: 1.6;
+    }
+    .tip-box strong { display: block; margin-bottom: 0.2rem; }
+
+    .screen-tag {
+      display: inline-flex; align-items: center; gap: 0.3rem;
+      background: rgba(0,229,160,0.08); border: 1px solid rgba(0,229,160,0.15);
+      border-radius: 0.5rem; padding: 0.25rem 0.6rem;
+      font-size: 0.7rem; color: var(--accent); margin-bottom: 0.75rem;
+    }
+
+    /* QUICK LINKS */
+    .quick-links {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 1.25rem; padding: 1.25rem; margin-bottom: 2rem;
+    }
+    .ql-title { font-family: var(--font-head); font-size: 0.85rem; font-weight: 700; margin-bottom: 0.875rem; }
+    .ql-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 0.5rem; }
+    .ql-item {
+      background: var(--surface2); border: 1px solid var(--border);
+      border-radius: 0.875rem; padding: 0.75rem; text-align: center;
+      text-decoration: none; transition: border-color 0.2s;
+    }
+    .ql-item:hover { border-color: rgba(0,229,160,0.3); }
+    .ql-icon { font-size: 1.25rem; margin-bottom: 0.3rem; }
+    .ql-label { font-size: 0.72rem; color: var(--muted); }
+
+    /* OBJECTIONS */
+    .objection {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 1.25rem; padding: 1.25rem; margin-bottom: 0.75rem;
+      cursor: pointer;
+    }
+    .obj-q {
+      font-size: 0.9rem; font-weight: 500; margin-bottom: 0;
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .obj-a { font-size: 0.82rem; color: var(--muted); margin-top: 0.75rem; line-height: 1.65; display: none; }
+    .objection.open .obj-a { display: block; }
+    .obj-toggle { color: var(--accent); font-size: 0.8rem; flex-shrink: 0; margin-left: 1rem; }
+
+    /* CTA */
+    .cta-box {
+      background: linear-gradient(135deg, rgba(0,229,160,0.08), rgba(0,170,255,0.05));
+      border: 1px solid rgba(0,229,160,0.15); border-radius: 1.5rem;
+      padding: 2rem; text-align: center; margin-top: 2rem;
+    }
+    .cta-title { font-family: var(--font-head); font-size: 1.25rem; font-weight: 800; margin-bottom: 0.5rem; }
+    .cta-sub { color: var(--muted); font-size: 0.85rem; margin-bottom: 1.5rem; }
+    .cta-btns { display: flex; gap: 0.75rem; justify-content: center; flex-wrap: wrap; }
+    .btn-p {
+      background: var(--accent); color: #000; border: none;
+      padding: 0.75rem 1.5rem; border-radius: 100px;
+      font-family: var(--font-head); font-size: 0.9rem; font-weight: 700;
+      cursor: pointer; text-decoration: none;
+    }
+    .btn-o {
+      background: transparent; color: var(--text);
+      border: 1px solid var(--border);
+      padding: 0.75rem 1.5rem; border-radius: 100px;
+      font-size: 0.88rem; cursor: pointer; text-decoration: none;
+    }
+  </style>
+</head>
+<body>
+
+  <nav class="topnav">
+    <div class="logo">Nest<span>Charge</span> <span style="color:var(--muted);font-weight:400;font-size:0.75rem;margin-left:0.5rem">Demo Guide</span></div>
+    <a href="pitch.html" class="nav-cta">Investor Pitch →</a>
+  </nav>
+
+  <div class="hero">
+    <div class="hero-tag">🎯 Demo Script</div>
+    <h1>How to demo NestCharge</h1>
+    <p>A step-by-step walkthrough for showing investors, users, or potential hosts exactly what NestCharge does and why it matters.</p>
+    <div class="time-badges">
+      <span class="time-badge">⏱ Investor demo: <strong>5 mins</strong></span>
+      <span class="time-badge">👤 User onboarding: <strong>3 mins</strong></span>
+      <span class="time-badge">🏠 Host onboarding: <strong>4 mins</strong></span>
+    </div>
+  </div>
+
+  <div class="main">
+
+    <!-- QUICK LINKS -->
+    <div class="quick-links">
+      <div class="ql-title">Jump to any screen</div>
+      <div class="ql-grid">
+        <a href="index.html" class="ql-item"><div class="ql-icon">🏠</div><div class="ql-label">Landing</div></a>
+        <a href="map.html" class="ql-item"><div class="ql-icon">🗺</div><div class="ql-label">Map</div></a>
+        <a href="booking.html" class="ql-item"><div class="ql-icon">📋</div><div class="ql-label">Booking</div></a>
+        <a href="host.html" class="ql-item"><div class="ql-icon">🔌</div><div class="ql-label">Host Form</div></a>
+        <a href="auth.html" class="ql-item"><div class="ql-icon">🔐</div><div class="ql-label">Login</div></a>
+        <a href="bookings.html" class="ql-item"><div class="ql-icon">⚡</div><div class="ql-label">Dashboard</div></a>
+        <a href="pitch.html" class="ql-item"><div class="ql-icon">💼</div><div class="ql-label">Pitch</div></a>
+      </div>
+    </div>
+
+    <!-- AUDIENCE TABS -->
+    <div class="audience-tabs">
+      <button class="aud-tab active" onclick="switchAudience('investor', this)">💼 Investor Demo</button>
+      <button class="aud-tab" onclick="switchAudience('driver', this)">🚗 Driver Flow</button>
+      <button class="aud-tab" onclick="switchAudience('host', this)">🏠 Host Flow</button>
+    </div>
+
+    <!-- INVESTOR FLOW -->
+    <div class="flow active" id="flow-investor">
+
+      <div class="step-card">
+        <div class="step-header">
+          <div class="step-num">1</div>
+          <div>
+            <div class="screen-tag">📱 nestcharge.vercel.app</div>
+            <div class="step-title">Open the landing page</div>
+          </div>
+        </div>
+        <p class="step-desc">Start here. Hand them your phone or share the link. Give them 10 seconds to read the headline before saying anything.</p>
+        <ul class="talking-points">
+          <li>"900,000 EVs on UK roads. 60% have nowhere to charge at home. This is that problem."</li>
+          <li>"No app download needed — it's a PWA. Opens instantly in any browser."</li>
+          <li>"We built this in weeks. The entire stack is live and working."</li>
+        </ul>
+        <div class="tip-box"><strong>💡 Tip</strong> Let them scroll through the landing page naturally. Don't rush. The stats strip and how-it-works section do the selling for you.</div>
+      </div>
+
+      <div class="step-card">
+        <div class="step-header">
+          <div class="step-num">2</div>
+          <div>
+            <div class="screen-tag">🗺 /map.html</div>
+            <div class="step-title">Show the map screen</div>
+          </div>
+        </div>
+        <p class="step-desc">This is where the product comes alive. Tap a charger pin and show the bottom sheet sliding up.</p>
+        <ul class="talking-points">
+          <li>"This is what a driver sees when they open the app — real chargers, real hosts, real prices."</li>
+          <li>"Tap Sarah's Driveway. Look at the detail — host rating, charge speed, availability slots."</li>
+          <li>"The filters let you sort by speed, price, and availability. Same UX as Airbnb or Uber."</li>
+        </ul>
+        <div class="tip-box"><strong>💡 Tip</strong> Tap the Sarah's Driveway pin, then tap the 09:00 slot to show it selecting. Then say "at this point the driver taps Book — let me show you that flow."</div>
+      </div>
+
+      <div class="step-card">
+        <div class="step-header">
+          <div class="step-num">3</div>
+          <div>
+            <div class="screen-tag">💳 /booking.html</div>
+            <div class="step-title">Walk through the booking and payment</div>
+          </div>
+        </div>
+        <p class="step-desc">Show the 3-step booking flow. This is where the business model becomes tangible.</p>
+        <ul class="talking-points">
+          <li>"Review screen shows the full price breakdown — charging cost plus our platform fee."</li>
+          <li>"We take 20% of every session automatically via Stripe Connect."</li>
+          <li>"Stripe handles all the compliance, fraud protection, and payouts to hosts."</li>
+          <li>"Test card: 4242 4242 4242 4242 — any expiry and CVC."</li>
+        </ul>
+        <div class="tip-box"><strong>💡 Tip</strong> Enter the test card details live. Watching a real payment flow process is far more convincing than slides. The confirmation screen with booking reference lands well.</div>
+      </div>
+
+      <div class="step-card">
+        <div class="step-header">
+          <div class="step-num">4</div>
+          <div>
+            <div class="screen-tag">📊 /bookings.html</div>
+            <div class="step-title">Show the bookings dashboard</div>
+          </div>
+        </div>
+        <p class="step-desc">This shows the full product experience — not just booking but ongoing relationship with the app.</p>
+        <ul class="talking-points">
+          <li>"This is what a returning driver sees — their full session history, live charging status, upcoming bookings."</li>
+          <li>"The bottom nav connects every screen. It feels like a native app."</li>
+          <li>"Real session data will come from Supabase — we've already set up the database."</li>
+        </ul>
+      </div>
+
+      <div class="step-card">
+        <div class="step-header">
+          <div class="step-num">5</div>
+          <div>
+            <div class="screen-tag">💼 /pitch.html</div>
+            <div class="step-title">Close with the pitch page</div>
+          </div>
+        </div>
+        <p class="step-desc">Send them the pitch page link afterwards. It has everything they need to make a decision.</p>
+        <ul class="talking-points">
+          <li>"The market is £2.4B in the UK alone by 2030."</li>
+          <li>"We have 847 waitlist signups with zero marketing spend."</li>
+          <li>"We're raising £350K seed to onboard 50 hosts and process the first 500 real sessions."</li>
+          <li>"After that we have everything we need to raise a Series A."</li>
+        </ul>
+        <div class="tip-box"><strong>💡 Tip</strong> End by asking: "Does this solve a problem you understand?" Most people in the UK have experienced the EV charging frustration personally or know someone who has.</div>
+      </div>
+
+      <!-- OBJECTIONS -->
+      <div style="margin-top:2rem">
+        <div style="font-family:var(--font-head);font-size:0.85rem;font-weight:700;margin-bottom:1rem;color:var(--muted);text-transform:uppercase;letter-spacing:0.07em">Common Investor Questions</div>
+
+        <div class="objection" onclick="toggleObj(this)">
+          <div class="obj-q">"How is this different from public charging networks?" <span class="obj-toggle">+</span></div>
+          <div class="obj-a">Public networks are expensive (65-85p/kWh vs our 18-32p), require detours, and are often broken. We're not competing with them — we're serving the 60% of EV owners they completely ignore: renters and flat dwellers who need convenient, affordable, near-home charging.</div>
+        </div>
+
+        <div class="objection" onclick="toggleObj(this)">
+          <div class="obj-q">"What stops someone just using ChargePoint or Pod Point?" <span class="obj-toggle">+</span></div>
+          <div class="obj-a">Those are public network operators. Our hosts are private individuals. We're peer-to-peer, like Airbnb vs a hotel. The host can be 50 metres from the driver's front door. No other platform does hyperlocal residential charging.</div>
+        </div>
+
+        <div class="objection" onclick="toggleObj(this)">
+          <div class="obj-q">"What's stopping a big company copying this?" <span class="obj-toggle">+</span></div>
+          <div class="obj-a">Network effects. The value of NestCharge is the density of hosts in each neighbourhood. Once we have 20 hosts in a postcode, drivers always have somewhere nearby. That density is hard to replicate quickly — and it compounds as drivers bring more hosts.</div>
+        </div>
+
+        <div class="objection" onclick="toggleObj(this)">
+          <div class="obj-q">"What about insurance and liability?" <span class="obj-toggle">+</span></div>
+          <div class="obj-a">We've designed around this. Hosts use their existing home insurance (which typically covers occasional commercial activity). We provide session-level liability coverage for any charging-related incidents as part of our platform fee. We've modelled this on how Airbnb approached host protection.</div>
+        </div>
+
+        <div class="objection" onclick="toggleObj(this)">
+          <div class="obj-q">"This is early stage — where's the revenue?" <span class="obj-toggle">+</span></div>
+          <div class="obj-a">We're pre-revenue by design — we're building supply (hosts) before opening demand (drivers) to avoid the empty marketplace problem. The waitlist proves demand exists. The £350K seed specifically funds the supply-side onboarding to create our first dense neighbourhood in London.</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- DRIVER FLOW -->
+    <div class="flow" id="flow-driver">
+      <div class="step-card">
+        <div class="step-header"><div class="step-num">1</div><div><div class="step-title">Visit nestcharge.vercel.app</div></div></div>
+        <p class="step-desc">No download needed. Open in your phone browser and tap Add to Home Screen to install it as an app.</p>
+        <ul class="talking-points">
+          <li>Works on iPhone and Android — any modern browser</li>
+          <li>Tap Share → Add to Home Screen on iPhone</li>
+          <li>Opens fullscreen like a native app</li>
+        </ul>
+      </div>
+      <div class="step-card">
+        <div class="step-header"><div class="step-num">2</div><div><div class="screen-tag">🔐 /auth.html</div><div class="step-title">Create your account</div></div></div>
+        <p class="step-desc">Sign up with your email or Google. Select "I'm a Driver" as your role.</p>
+        <ul class="talking-points">
+          <li>Real signup — your account is created in our database</li>
+          <li>Google sign-in is the fastest option</li>
+          <li>You'll see your profile dashboard immediately after</li>
+        </ul>
+      </div>
+      <div class="step-card">
+        <div class="step-header"><div class="step-num">3</div><div><div class="screen-tag">🗺 /map.html</div><div class="step-title">Find a charger near you</div></div></div>
+        <p class="step-desc">Browse the map, tap a charger pin, and see price, speed, distance and availability.</p>
+        <ul class="talking-points">
+          <li>Use the filter chips to narrow by speed or price</li>
+          <li>Tap the locate button to centre on your position</li>
+          <li>Select a time slot on the detail panel</li>
+        </ul>
+      </div>
+      <div class="step-card">
+        <div class="step-header"><div class="step-num">4</div><div><div class="screen-tag">💳 /booking.html</div><div class="step-title">Book and pay</div></div></div>
+        <p class="step-desc">Review your booking summary and pay securely with Stripe.</p>
+        <ul class="talking-points">
+          <li>Test card: 4242 4242 4242 4242 · Any expiry · Any CVC</li>
+          <li>You get a booking reference immediately</li>
+          <li>Host is notified and access instructions are sent</li>
+        </ul>
+        <div class="tip-box"><strong>Note</strong> We're in test mode — no real charges. Your live session will work identically when we launch in your area.</div>
+      </div>
+    </div>
+
+    <!-- HOST FLOW -->
+    <div class="flow" id="flow-host">
+      <div class="step-card">
+        <div class="step-header"><div class="step-num">1</div><div><div class="step-title">Visit nestcharge.vercel.app</div></div></div>
+        <p class="step-desc">Open in your phone browser. No download needed. Add to Home Screen for the best experience.</p>
+        <ul class="talking-points">
+          <li>Works on any smartphone</li>
+          <li>Tap the Host tab in the bottom nav</li>
+        </ul>
+      </div>
+      <div class="step-card">
+        <div class="step-header"><div class="step-num">2</div><div><div class="screen-tag">🔐 /auth.html</div><div class="step-title">Create a host account</div></div></div>
+        <p class="step-desc">Sign up and select "I'm a Host" as your role. We'll set up your Stripe payout account in the next step.</p>
+        <ul class="talking-points">
+          <li>Google sign-in is fastest</li>
+          <li>Your payout bank details are connected via Stripe — we never see your bank info</li>
+        </ul>
+      </div>
+      <div class="step-card">
+        <div class="step-header"><div class="step-num">3</div><div><div class="screen-tag">🔌 /host.html</div><div class="step-title">List your charger</div></div></div>
+        <p class="step-desc">The 4-step listing form takes about 5 minutes. You set your own price and availability.</p>
+        <ul class="talking-points">
+          <li>Step 1: Charger type, connector, speed and listing name</li>
+          <li>Step 2: Address, location type and access instructions</li>
+          <li>Step 3: Available days, time slots and hourly price</li>
+          <li>Step 4: Review everything before going live</li>
+        </ul>
+        <div class="tip-box"><strong>💡 Pricing tip</strong> £0.25–£0.32/hr is the sweet spot. It's significantly cheaper than public charging for drivers, and still earns you £600–£900/year at typical usage.</div>
+      </div>
+      <div class="step-card">
+        <div class="step-header"><div class="step-num">4</div><div><div class="step-title">Start earning</div></div></div>
+        <p class="step-desc">Once your listing is live, nearby drivers can find and book your charger. You get notified for each booking.</p>
+        <ul class="talking-points">
+          <li>You earn 80% of every session — we take 20%</li>
+          <li>Payouts go to your bank within 2 business days via Stripe</li>
+          <li>You can pause or remove your listing any time</li>
+          <li>Driver's exact arrival info is only shared after you confirm</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- FOOTER CTA -->
+    <div class="cta-box">
+      <div class="cta-title">Ready to go deeper?</div>
+      <div class="cta-sub">See the full investor pitch or get in touch to discuss the opportunity.</div>
+      <div class="cta-btns">
+        <a href="pitch.html" class="btn-p">💼 Investor Pitch</a>
+        <a href="mailto:hello@nestcharge.com" class="btn-o">📧 Get in touch</a>
+      </div>
+    </div>
+
+  </div>
+
+  <script>
+    function switchAudience(id, btn) {
+      document.querySelectorAll('.flow').forEach(f => f.classList.remove('active'));
+      document.querySelectorAll('.aud-tab').forEach(t => t.classList.remove('active'));
+      document.getElementById('flow-' + id).classList.add('active');
+      btn.classList.add('active');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    function toggleObj(el) {
+      el.classList.toggle('open');
+      el.querySelector('.obj-toggle').textContent = el.classList.contains('open') ? '−' : '+';
+    }
+  </script>
+</body>
+</html>
