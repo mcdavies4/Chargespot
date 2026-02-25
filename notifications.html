@@ -1,0 +1,439 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#0a0f1e" />
+  <title>NestCharge — Notifications</title>
+  <link rel="manifest" href="manifest.json" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@600;700;800&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet" />
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg: #070c1a; --bg2: #0d1428; --surface: #111827; --surface2: #1a2236;
+      --border: rgba(255,255,255,0.07); --accent: #00e5a0; --accent2: #0af;
+      --text: #f0f4ff; --muted: #8892a4; --error: #ff5e7d;
+      --font-head: 'Syne', sans-serif; --font-body: 'DM Sans', sans-serif;
+    }
+    html { overflow-x: hidden; }
+    body {
+      min-height: 100vh; font-family: var(--font-body);
+      background: var(--bg); color: var(--text);
+      font-weight: 300; line-height: 1.6; padding-bottom: 72px;
+    }
+
+    /* TOP BAR */
+    .topbar {
+      display: flex; align-items: center; gap: 1rem;
+      padding: 1.25rem 1.25rem 0;
+      position: sticky; top: 0; background: var(--bg); z-index: 10;
+    }
+    .back-btn {
+      width: 38px; height: 38px; border-radius: 50%;
+      background: var(--surface); border: 1px solid var(--border);
+      color: var(--text); font-size: 1rem; cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      text-decoration: none;
+    }
+    .logo { font-family: var(--font-head); font-size: 1.1rem; font-weight: 800; }
+    .logo span { color: var(--accent); }
+
+    /* MAIN */
+    .main { max-width: 480px; margin: 0 auto; padding: 2rem 1.25rem 2rem; }
+
+    /* HERO */
+    .notif-hero {
+      text-align: center; padding: 2rem 0 2.5rem;
+    }
+    .notif-icon {
+      width: 80px; height: 80px; border-radius: 50%;
+      background: rgba(0,229,160,0.1); border: 2px solid rgba(0,229,160,0.2);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 2.2rem; margin: 0 auto 1.25rem;
+    }
+    .notif-title { font-family: var(--font-head); font-size: 1.5rem; font-weight: 800; margin-bottom: 0.5rem; }
+    .notif-sub { font-size: 0.88rem; color: var(--muted); max-width: 300px; margin: 0 auto; }
+
+    /* STATUS CARD */
+    .status-card {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 1.25rem; padding: 1.25rem; margin-bottom: 1.5rem;
+      display: flex; align-items: center; gap: 1rem;
+    }
+    .status-dot {
+      width: 12px; height: 12px; border-radius: 50%;
+      background: var(--muted); flex-shrink: 0;
+    }
+    .status-dot.enabled { background: var(--accent); box-shadow: 0 0 8px rgba(0,229,160,0.5); }
+    .status-dot.denied { background: var(--error); }
+    .status-text { flex: 1; }
+    .status-label { font-weight: 500; font-size: 0.92rem; }
+    .status-sub { font-size: 0.78rem; color: var(--muted); margin-top: 0.1rem; }
+
+    /* NOTIFICATION TYPES */
+    .section-title {
+      font-size: 0.7rem; font-weight: 600; letter-spacing: 0.09em;
+      text-transform: uppercase; color: var(--muted);
+      margin-bottom: 0.75rem;
+    }
+
+    .notif-list {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 1.25rem; overflow: hidden; margin-bottom: 1.5rem;
+    }
+
+    .notif-item {
+      display: flex; align-items: center; gap: 1rem;
+      padding: 1rem 1.25rem;
+      border-bottom: 1px solid var(--border);
+    }
+    .notif-item:last-child { border-bottom: none; }
+
+    .notif-item-icon {
+      width: 40px; height: 40px; border-radius: 50%;
+      background: var(--surface2); display: flex;
+      align-items: center; justify-content: center;
+      font-size: 1.1rem; flex-shrink: 0;
+    }
+
+    .notif-item-text { flex: 1; }
+    .notif-item-label { font-size: 0.9rem; font-weight: 400; }
+    .notif-item-desc { font-size: 0.75rem; color: var(--muted); margin-top: 0.1rem; }
+
+    /* TOGGLE */
+    .toggle {
+      width: 44px; height: 24px; border-radius: 100px;
+      background: var(--surface2); border: 1px solid var(--border);
+      cursor: pointer; position: relative; transition: background 0.3s;
+      flex-shrink: 0;
+    }
+    .toggle.on { background: var(--accent); border-color: var(--accent); }
+    .toggle::after {
+      content: ''; position: absolute;
+      width: 18px; height: 18px; border-radius: 50%;
+      background: white; top: 2px; left: 2px;
+      transition: left 0.3s;
+    }
+    .toggle.on::after { left: 22px; }
+
+    /* BUTTONS */
+    .btn-primary {
+      width: 100%; background: var(--accent); color: #000; border: none;
+      padding: 1rem; border-radius: 100px;
+      font-family: var(--font-head); font-size: 1rem; font-weight: 700;
+      cursor: pointer; transition: opacity 0.2s;
+      display: flex; align-items: center; justify-content: center; gap: 0.5rem;
+    }
+    .btn-primary:hover { opacity: 0.88; }
+    .btn-primary:disabled { opacity: 0.4; cursor: not-allowed; }
+
+    .btn-test {
+      width: 100%; background: var(--surface); color: var(--text);
+      border: 1px solid var(--border); padding: 0.875rem; border-radius: 100px;
+      font-family: var(--font-body); font-size: 0.9rem; cursor: pointer;
+      transition: border-color 0.2s; margin-top: 0.75rem;
+    }
+    .btn-test:hover { border-color: rgba(255,255,255,0.2); }
+
+    /* ALERT */
+    .alert {
+      padding: 0.875rem 1rem; border-radius: 0.875rem;
+      font-size: 0.85rem; margin-bottom: 1rem;
+      display: none; align-items: center; gap: 0.5rem;
+    }
+    .alert.show { display: flex; }
+    .alert.success { background: rgba(0,229,160,0.1); border: 1px solid rgba(0,229,160,0.25); color: var(--accent); }
+    .alert.error { background: rgba(255,94,125,0.1); border: 1px solid rgba(255,94,125,0.25); color: var(--error); }
+    .alert.info { background: rgba(0,170,255,0.1); border: 1px solid rgba(0,170,255,0.25); color: var(--accent2); }
+
+    /* BOTTOM NAV */
+    .bottom-nav {
+      position: fixed; bottom: 0; left: 0; right: 0; height: 72px;
+      background: rgba(13,20,40,0.97); backdrop-filter: blur(16px);
+      border-top: 1px solid var(--border);
+      display: flex; align-items: center; justify-content: space-around;
+      padding: 0 0.5rem; z-index: 100;
+    }
+    .nav-item {
+      display: flex; flex-direction: column; align-items: center;
+      gap: 0.25rem; padding: 0.5rem 1rem; border-radius: 0.875rem;
+      text-decoration: none; transition: background 0.2s; min-width: 60px;
+    }
+    .nav-item:hover { background: rgba(255,255,255,0.04); }
+    .nav-item.active { background: rgba(0,229,160,0.08); }
+    .nav-icon { font-size: 1.3rem; line-height: 1; }
+    .nav-label { font-size: 0.65rem; font-weight: 500; color: var(--muted); }
+    .nav-item.active .nav-label { color: var(--accent); }
+  </style>
+</head>
+<body>
+
+  <div class="topbar">
+    <a href="bookings.html" class="back-btn">←</a>
+    <div class="logo">Nest<span>Charge</span></div>
+  </div>
+
+  <div class="main">
+
+    <!-- HERO -->
+    <div class="notif-hero">
+      <div class="notif-icon">🔔</div>
+      <div class="notif-title">Stay in the loop</div>
+      <p class="notif-sub">Get instant alerts when your booking is confirmed, your car is charged, and more.</p>
+    </div>
+
+    <!-- ALERT -->
+    <div class="alert" id="alert"></div>
+
+    <!-- STATUS -->
+    <div class="status-card" id="status-card">
+      <div class="status-dot" id="status-dot"></div>
+      <div class="status-text">
+        <div class="status-label" id="status-label">Checking status...</div>
+        <div class="status-sub" id="status-sub">Please wait</div>
+      </div>
+    </div>
+
+    <!-- NOTIFICATION TYPES -->
+    <div class="section-title">What you'll be notified about</div>
+    <div class="notif-list">
+      <div class="notif-item">
+        <div class="notif-item-icon">✅</div>
+        <div class="notif-item-text">
+          <div class="notif-item-label">Booking confirmed</div>
+          <div class="notif-item-desc">When a host accepts your booking request</div>
+        </div>
+        <div class="toggle on" id="toggle-booking"></div>
+      </div>
+      <div class="notif-item">
+        <div class="notif-item-icon">⚡</div>
+        <div class="notif-item-text">
+          <div class="notif-item-label">Charging complete</div>
+          <div class="notif-item-desc">When your EV has finished charging</div>
+        </div>
+        <div class="toggle on" id="toggle-charging"></div>
+      </div>
+      <div class="notif-item">
+        <div class="notif-item-icon">🏠</div>
+        <div class="notif-item-text">
+          <div class="notif-item-label">New booking request</div>
+          <div class="notif-item-desc">When a driver wants to use your charger</div>
+        </div>
+        <div class="toggle on" id="toggle-host"></div>
+      </div>
+      <div class="notif-item">
+        <div class="notif-item-icon">💷</div>
+        <div class="notif-item-text">
+          <div class="notif-item-label">Payment received</div>
+          <div class="notif-item-desc">When a session payment lands in your account</div>
+        </div>
+        <div class="toggle on" id="toggle-payment"></div>
+      </div>
+      <div class="notif-item">
+        <div class="notif-item-icon">⭐</div>
+        <div class="notif-item-text">
+          <div class="notif-item-label">New review</div>
+          <div class="notif-item-desc">When a driver leaves you a rating</div>
+        </div>
+        <div class="toggle" id="toggle-review"></div>
+      </div>
+    </div>
+
+    <!-- ENABLE BUTTON -->
+    <button class="btn-primary" id="enable-btn" onclick="enableNotifications()">
+      🔔 Enable Notifications
+    </button>
+    <button class="btn-test" id="test-btn" onclick="sendTestNotification()" style="display:none">
+      Send a test notification
+    </button>
+
+  </div>
+
+  <!-- BOTTOM NAV -->
+  <nav class="bottom-nav">
+    <a href="index.html" class="nav-item"><span class="nav-icon">🏠</span><span class="nav-label">Home</span></a>
+    <a href="map.html" class="nav-item"><span class="nav-icon">🗺</span><span class="nav-label">Find</span></a>
+    <a href="bookings.html" class="nav-item"><span class="nav-icon">📋</span><span class="nav-label">Bookings</span></a>
+    <a href="host.html" class="nav-item"><span class="nav-icon">🔌</span><span class="nav-label">Host</span></a>
+    <a href="auth.html" class="nav-item"><span class="nav-icon">👤</span><span class="nav-label">Profile</span></a>
+  </nav>
+
+  <script>
+    // ── SUPABASE ──
+    const { createClient } = supabase;
+    const sb = createClient(
+      'https://ovhezomrlrfajrmwbdya.supabase.co',
+      'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im92aGV6b21ybHJmYWpybXdiZHlhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzE5NjM1MzEsImV4cCI6MjA4NzUzOTUzMX0.UTFUvtMKkyIIdJrc0GewWyTzAtONymUqZo_jJtT2ONI'
+    );
+
+    const VAPID_PUBLIC_KEY = 'BMmJzKgHhH-6FhZrOcKJ3jGrkgGBXHU28Oc-T7yI42BZsFr2hAlMirx8SQk1oFdB7km2L6ddV19DsSVQvYdvKwQ';
+
+    let currentSubscription = null;
+
+    // ── INIT ──
+    window.addEventListener('DOMContentLoaded', async () => {
+      await checkStatus();
+      setupToggles();
+
+      // Register service worker
+      if ('serviceWorker' in navigator) {
+        try {
+          await navigator.serviceWorker.register('/sw.js');
+        } catch (e) {
+          console.log('SW registration failed:', e);
+        }
+      }
+    });
+
+    // ── CHECK NOTIFICATION STATUS ──
+    async function checkStatus() {
+      const dot = document.getElementById('status-dot');
+      const label = document.getElementById('status-label');
+      const sub = document.getElementById('status-sub');
+      const btn = document.getElementById('enable-btn');
+      const testBtn = document.getElementById('test-btn');
+
+      if (!('Notification' in window)) {
+        dot.className = 'status-dot denied';
+        label.textContent = 'Not supported';
+        sub.textContent = 'Your browser does not support push notifications';
+        btn.disabled = true;
+        return;
+      }
+
+      if (Notification.permission === 'granted') {
+        dot.className = 'status-dot enabled';
+        label.textContent = 'Notifications enabled';
+        sub.textContent = 'You will receive alerts for bookings and charging sessions';
+        btn.textContent = '✅ Notifications Active';
+        btn.disabled = true;
+        testBtn.style.display = 'block';
+
+        // Get existing subscription
+        if ('serviceWorker' in navigator) {
+          const reg = await navigator.serviceWorker.ready;
+          currentSubscription = await reg.pushManager.getSubscription();
+        }
+
+      } else if (Notification.permission === 'denied') {
+        dot.className = 'status-dot denied';
+        label.textContent = 'Notifications blocked';
+        sub.textContent = 'Go to browser settings and allow notifications for this site';
+        btn.disabled = true;
+        btn.textContent = '🚫 Blocked in browser settings';
+      } else {
+        dot.className = 'status-dot';
+        label.textContent = 'Not yet enabled';
+        sub.textContent = 'Tap the button below to turn on notifications';
+      }
+    }
+
+    // ── ENABLE NOTIFICATIONS ──
+    async function enableNotifications() {
+      const btn = document.getElementById('enable-btn');
+      btn.disabled = true;
+      btn.textContent = 'Requesting permission...';
+
+      try {
+        const permission = await Notification.requestPermission();
+
+        if (permission !== 'granted') {
+          showAlert('Notifications were blocked. You can enable them in browser settings.', 'error');
+          btn.disabled = false;
+          btn.textContent = '🔔 Enable Notifications';
+          return;
+        }
+
+        // Register service worker and subscribe
+        const reg = await navigator.serviceWorker.ready;
+        const subscription = await reg.pushManager.subscribe({
+          userVisibleOnly: true,
+          applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY)
+        });
+
+        currentSubscription = subscription;
+
+        // Save subscription to Supabase
+        const { data: { session } } = await sb.auth.getSession();
+        if (session) {
+          await sb.from('push_subscriptions').upsert({
+            user_id: session.user.id,
+            subscription: subscription.toJSON()
+          }, { onConflict: 'user_id' });
+        }
+
+        await checkStatus();
+        showAlert('🎉 Notifications enabled! You will now receive alerts for your bookings.', 'success');
+
+      } catch (err) {
+        console.error('Push subscription error:', err);
+        showAlert('Something went wrong enabling notifications. Please try again.', 'error');
+        btn.disabled = false;
+        btn.textContent = '🔔 Enable Notifications';
+      }
+    }
+
+    // ── SEND TEST NOTIFICATION ──
+    async function sendTestNotification() {
+      if (!currentSubscription) {
+        showAlert('No active subscription found.', 'error');
+        return;
+      }
+
+      try {
+        const res = await fetch('/api/notify', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            subscription: currentSubscription.toJSON(),
+            title: 'NestCharge ⚡',
+            body: 'Test notification — everything is working perfectly!',
+            url: '/bookings.html',
+            tag: 'test'
+          })
+        });
+
+        if (res.ok) {
+          showAlert('✅ Test notification sent! Check your notifications.', 'success');
+        } else {
+          showAlert('Could not send test notification. Make sure the API is deployed.', 'error');
+        }
+      } catch (err) {
+        // If API not deployed yet, show local notification as fallback
+        new Notification('NestCharge ⚡', {
+          body: 'Test notification — everything is working perfectly!',
+          icon: '/icon-192.png'
+        });
+        showAlert('✅ Test notification sent!', 'success');
+      }
+    }
+
+    // ── TOGGLE SETUP ──
+    function setupToggles() {
+      document.querySelectorAll('.toggle').forEach(t => {
+        t.addEventListener('click', () => t.classList.toggle('on'));
+      });
+    }
+
+    // ── HELPERS ──
+    function showAlert(msg, type) {
+      const el = document.getElementById('alert');
+      el.textContent = msg;
+      el.className = 'alert show ' + type;
+      setTimeout(() => el.className = 'alert', 5000);
+    }
+
+    function urlBase64ToUint8Array(base64String) {
+      const padding = '='.repeat((4 - base64String.length % 4) % 4);
+      const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+      const rawData = window.atob(base64);
+      const outputArray = new Uint8Array(rawData.length);
+      for (let i = 0; i < rawData.length; ++i) outputArray[i] = rawData.charCodeAt(i);
+      return outputArray;
+    }
+  </script>
+
+</body>
+</html>
