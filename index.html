@@ -1506,19 +1506,41 @@ async function searchPostcode() {
 
 async function searchPostcodeChargers() {
   const raw = document.getElementById('search-inp').value.trim();
-  if (!/^[A-Z]{1,2}[0-9]/i.test(raw)) return renderList();
-  const result = await postcodeToLatLng(raw.replace(/\s/g,'').toUpperCase());
-  if (!result) return renderList();
-  userLat = result.lat; userLng = result.lng;
-  // Load OCM data for this area — will update charger list automatically
-  await loadOCMForLocation(result.lat, result.lng, result.display, 2);
-  // Show banner
-  const banner = document.getElementById('charger-postcode-banner');
-  banner.style.display = 'block';
-  banner.innerHTML = `<div style="background:var(--green-dim);border:1px solid #00e67633;border-radius:10px;padding:8px 12px;font-size:12px;color:var(--green);margin-bottom:8px;display:flex;justify-content:space-between">
-    <span>📍 ${chargers.length} chargers near <strong>${result.display}</strong></span>
-    <span style="cursor:pointer;color:var(--text-dim)" onclick="clearPostcodeChargers()">✕</span>
-  </div>`;
+  if (!raw) return renderList();
+
+  // Check if it looks like a postcode
+  const isPostcode = /^[A-Z]{1,2}[0-9]/i.test(raw);
+
+  if (isPostcode) {
+    const result = await postcodeToLatLng(raw.replace(/\s/g,'').toUpperCase());
+    if (!result) return renderList();
+    userLat = result.lat; userLng = result.lng;
+
+    // Switch to chargers tab so user sees the results
+    goTo('chargers');
+
+    // Show loading in charger list
+    document.getElementById('charger-list').innerHTML = '<div class="loading"><div class="spinner"></div>Finding chargers near ' + result.display + '...</div>';
+
+    // Load OCM data — renderList() is called inside when done
+    await loadOCMForLocation(result.lat, result.lng, result.display, 3);
+
+    // Show result banner
+    const banner = document.getElementById('charger-postcode-banner');
+    if (banner) {
+      banner.style.display = 'block';
+      banner.innerHTML = '<div style="background:var(--green-dim);border:1px solid #00e67633;border-radius:10px;padding:8px 12px;font-size:12px;color:var(--green);margin-bottom:8px;display:flex;justify-content:space-between">' +
+        '<span>📍 ' + chargers.length + ' chargers near <strong>' + result.display + '</strong></span>' +
+        '<span style="cursor:pointer;color:var(--text-dim)" onclick="clearPostcodeChargers()">✕</span>' +
+        '</div>';
+    }
+
+    // Force render the list with distance sorting
+    sortAndRenderByDistance(result.lat, result.lng, result.display);
+  } else {
+    // Text search — just filter
+    renderList();
+  }
 }
 
 async function postcodeToLatLng(pc) {
@@ -1734,31 +1756,50 @@ function renderList() {
     return true;
   });
 
-  if (!filtered.length) { el.innerHTML = '<div style="padding:40px;text-align:center;color:var(--text-dim);font-size:14px">No chargers match your filter</div>'; return; }
+  if (!chargers.length) {
+    el.innerHTML = '<div style="padding:50px 24px;text-align:center;color:var(--text-dim)">' +
+      '<div style="font-size:40px;margin-bottom:12px">🔌</div>' +
+      '<div style="font-size:15px;font-weight:700;color:var(--text);margin-bottom:8px">Search for chargers near you</div>' +
+      '<div style="font-size:13px;margin-bottom:20px">Enter a postcode in the search bar above</div>' +
+      '</div>';
+    return;
+  }
 
-  el.innerHTML = filtered.map(c => {
-    const s = getSlots(c.id);
-    const status = getStatus(c.id);
-    const avail = s.filter(x => x.status === 'available').length;
-    const maxKw = s.length ? Math.max(...s.map(x => x.kw || 0)) : 0;
-    const bc = status === 'available' ? 'b-green' : status === 'busy' ? 'b-amber' : 'b-red';
-    const bt = status === 'available' ? `✅ ${avail} Free` : status === 'busy' ? `⏳ ${avail} Free` : '🔴 Full';
-    const dots = s.map(x => `<div class="cd" style="background:${x.status==='available'?'var(--green)':x.status==='booked'?'var(--blue)':'var(--amber)'}"></div>`).join('');
-    const pct = s.length ? (avail / s.length) * 100 : 0;
-    return `<div class="cc fade-up" onclick="openDetail('${c.id}')">
-      ${c.ocm ? '<div class="api-badge">🌐 Live Data</div>' : ''}
-      <div class="cc-row1"><div class="cc-name">${c.name}</div><div class="badge ${bc}">${bt}</div></div>
-      <div class="cc-addr">📍 ${c.address || ''}</div>
-      <div class="cc-meta">
-        ${maxKw ? `<span>⚡ ${maxKw}kW</span>` : ''}
-        <span>💰 ${c.price || 'Free'}</span>
-        <span>⭐ ${c.rating || '—'}</span>
-        ${notifyList[c.id] ? '<span style="color:var(--amber)">🔔</span>' : ''}
-      </div>
-      <div class="cc-dots">${dots}</div>
-      <div class="avail-bar"><div class="avail-fill" style="width:${pct}%;background:${pct>50?'var(--green)':pct>0?'var(--amber)':'var(--red)'}"></div></div>
-    </div>`;
-  }).join('');
+  if (!filtered.length) {
+    el.innerHTML = '<div style="padding:40px;text-align:center;color:var(--text-dim);font-size:14px">No chargers match your filter</div>';
+    return;
+  }
+
+  var html = '';
+  for (var i = 0; i < filtered.length; i++) {
+    var c = filtered[i];
+    var s = getSlots(c.id);
+    var status = getStatus(c.id);
+    var avail = s.filter(function(x){return x.status==='available';}).length;
+    var maxKw = s.length ? Math.max.apply(null, s.map(function(x){return x.kw||0;})) : 0;
+    var bc = status==='available'?'b-green':status==='busy'?'b-amber':'b-red';
+    var bt = status==='available'?'✅ '+avail+' Free':status==='busy'?'⏳ '+avail+' Free':'🔴 Full';
+    var pct = s.length ? (avail/s.length)*100 : 0;
+    var dots = s.map(function(x){
+      return '<div class="cd" style="background:'+(x.status==='available'?'var(--green)':x.status==='booked'?'var(--blue)':'var(--amber)')+'"></div>';
+    }).join('');
+    var distStr = (userLat && userLng && c.lat && c.lng) ? distKm(userLat,userLng,c.lat,c.lng) : null;
+    var distLabel = distStr ? (distStr < 1 ? Math.round(distStr*1000)+'m' : distStr.toFixed(1)+'km') : '';
+
+    html += '<div class="cc fade-up" data-cid="'+c.id+'" onclick="openDetail(this.dataset.cid)">';
+    if (c.ocm) html += '<div class="api-badge">🌐 Live Data</div>';
+    html += '<div class="cc-row1"><div class="cc-name">'+c.name+'</div><div class="badge '+bc+'">'+bt+'</div></div>';
+    html += '<div class="cc-addr">📍 '+(c.address||'')+(distLabel?' <span style="color:var(--accent);font-weight:700;margin-left:6px">'+distLabel+' away</span>':'')+'</div>';
+    html += '<div class="cc-meta">';
+    if (maxKw) html += '<span>⚡ '+maxKw+'kW</span>';
+    html += '<span>💰 '+(c.price||'Unknown')+'</span>';
+    if (notifyList[c.id]) html += '<span style="color:var(--amber)">🔔</span>';
+    html += '</div>';
+    html += '<div class="cc-dots">'+dots+'</div>';
+    html += '<div class="avail-bar"><div class="avail-fill" style="width:'+pct+'%;background:'+(pct>50?'var(--green)':pct>0?'var(--amber)':'var(--red)')+'"></div></div>';
+    html += '</div>';
+  }
+  el.innerHTML = html;
 }
 
 function setFilter(f, el) {
