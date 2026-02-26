@@ -1,11 +1,7 @@
 {
-  "name": "nestcharge",
+  "name": "chargespot",
   "version": "1.0.0",
-  "description": "NestCharge — Peer-to-peer EV charging PWA",
-  "dependencies": {
-    "web-push": "^3.6.7"
-  },
   "engines": {
-    "node": "18.x"
+    "node": "24.x"
   }
 }
